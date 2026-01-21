@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native';
-import { Card, Text, TextInput, Button, RadioButton, Divider } from 'react-native-paper';
+import { Card, Text, TextInput, Button, RadioButton, FAB, Menu, TouchableRipple } from 'react-native-paper';
 import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
@@ -9,13 +9,25 @@ export default function ProcessApplicationScreen({ route, navigation }) {
   const { caseData } = route.params || {};
   
   // Determine case type from FL Type (Bv = Business Verification, Rv = Residential Verification)
-  const flType = caseData?.subtitle?.split(':')[1]?.trim()?.toLowerCase() || 'bv';
-  const caseType = flType.includes('rv') ? 'rv' : 'bv';
+  // Check fl_type directly first, then fallback to subtitle parsing
+  const flTypeFromData = caseData?.fl_type?.toLowerCase() || 
+    caseData?.subtitle?.split(':')[1]?.trim()?.toLowerCase() || 
+    'bv';
+  const caseType = flTypeFromData.includes('rv') ? 'rv' : 'bv';
   const isBv = caseType === 'bv';
   const isRv = caseType === 'rv';
 
   // Step management
   const [step, setStep] = useState('details');
+  
+  // Menu state for status dropdown
+  const [statusMenuVisible, setStatusMenuVisible] = useState(false);
+  
+  // Menu state for signboard dropdown
+  const [signboardMenuVisible, setSignboardMenuVisible] = useState(false);
+  
+  // Menu state for id proof dropdown
+  const [idProofMenuVisible, setIdProofMenuVisible] = useState(false);
   
   // Form data state
   const [formData, setFormData] = useState({
@@ -97,6 +109,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     additional_remark: '',
     // Location Pictures
     locationPictures: [],
+    photo_source: '', // 'camera', 'gallery', or 'no_photo'
   });
 
   const updateFormData = (path, value) => {
@@ -155,7 +168,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
           </View>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>FL Type:</Text>
-            <Text style={styles.detailValue}>{caseData?.fl_type || flType}</Text>
+            <Text style={styles.detailValue}>{caseData?.fl_type?.toUpperCase() || flTypeFromData.toUpperCase()}</Text>
           </View>
           {isBv && (
             <View style={styles.detailRow}>
@@ -590,13 +603,38 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             mode="outlined"
             style={styles.input}
           />
-          <TextInput
-            label="Signboard seen with name"
-            value={formData.signboard_seen_with_name}
-            onChangeText={(val) => updateFormData('signboard_seen_with_name', val)}
-            mode="outlined"
-            style={styles.input}
-          />
+          <Menu
+            visible={signboardMenuVisible}
+            onDismiss={() => setSignboardMenuVisible(false)}
+            anchor={
+              <TouchableRipple
+                onPress={() => setSignboardMenuVisible(true)}
+                style={styles.dropdownInput}
+              >
+                <View style={styles.dropdownContainer}>
+                  <Text style={[styles.dropdownLabel, !formData.signboard_seen_with_name && styles.dropdownPlaceholder]}>
+                    {formData.signboard_seen_with_name ? formData.signboard_seen_with_name.charAt(0).toUpperCase() + formData.signboard_seen_with_name.slice(1) : 'Signboard seen with name'}
+                  </Text>
+                  <Text style={styles.dropdownArrow}>▼</Text>
+                </View>
+              </TouchableRipple>
+            }
+          >
+            <Menu.Item
+              onPress={() => {
+                updateFormData('signboard_seen_with_name', 'yes');
+                setSignboardMenuVisible(false);
+              }}
+              title="Yes"
+            />
+            <Menu.Item
+              onPress={() => {
+                updateFormData('signboard_seen_with_name', 'no');
+                setSignboardMenuVisible(false);
+              }}
+              title="No"
+            />
+          </Menu>
           <TextInput
             label="Exterior and off floor"
             value={formData.self_employed.exterior_off_floor}
@@ -659,13 +697,38 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             mode="outlined"
             style={styles.input}
           />
-          <TextInput
-            label="Id proof seen*"
-            value={formData.service.id_proof_seen}
-            onChangeText={(val) => updateFormData('service.id_proof_seen', val)}
-            mode="outlined"
-            style={styles.input}
-          />
+          <Menu
+            visible={idProofMenuVisible}
+            onDismiss={() => setIdProofMenuVisible(false)}
+            anchor={
+              <TouchableRipple
+                onPress={() => setIdProofMenuVisible(true)}
+                style={styles.dropdownInput}
+              >
+                <View style={styles.dropdownContainer}>
+                  <Text style={[styles.dropdownLabel, !formData.service.id_proof_seen && styles.dropdownPlaceholder]}>
+                    {formData.service.id_proof_seen ? formData.service.id_proof_seen.charAt(0).toUpperCase() + formData.service.id_proof_seen.slice(1) : 'Id proof seen*'}
+                  </Text>
+                  <Text style={styles.dropdownArrow}>▼</Text>
+                </View>
+              </TouchableRipple>
+            }
+          >
+            <Menu.Item
+              onPress={() => {
+                updateFormData('service.id_proof_seen', 'yes');
+                setIdProofMenuVisible(false);
+              }}
+              title="Yes"
+            />
+            <Menu.Item
+              onPress={() => {
+                updateFormData('service.id_proof_seen', 'no');
+                setIdProofMenuVisible(false);
+              }}
+              title="No"
+            />
+          </Menu>
           <TextInput
             label="Employee seen*"
             value={formData.service.employee_seen}
@@ -736,13 +799,38 @@ export default function ProcessApplicationScreen({ route, navigation }) {
 
   const renderCaseStatus = () => (
     <View>
-      <TextInput
-        label="Status*"
-        value={formData.case_status}
-        onChangeText={(val) => updateFormData('case_status', val)}
-        mode="outlined"
-        style={styles.input}
-      />
+      <Menu
+        visible={statusMenuVisible}
+        onDismiss={() => setStatusMenuVisible(false)}
+        anchor={
+          <TouchableRipple
+            onPress={() => setStatusMenuVisible(true)}
+            style={styles.dropdownInput}
+          >
+            <View style={styles.dropdownContainer}>
+              <Text style={[styles.dropdownLabel, !formData.case_status && styles.dropdownPlaceholder]}>
+                {formData.case_status ? formData.case_status.charAt(0).toUpperCase() + formData.case_status.slice(1) : 'Status*'}
+              </Text>
+              <Text style={styles.dropdownArrow}>▼</Text>
+            </View>
+          </TouchableRipple>
+        }
+      >
+        <Menu.Item
+          onPress={() => {
+            updateFormData('case_status', 'positive');
+            setStatusMenuVisible(false);
+          }}
+          title="Positive"
+        />
+        <Menu.Item
+          onPress={() => {
+            updateFormData('case_status', 'negative');
+            setStatusMenuVisible(false);
+          }}
+          title="Negative"
+        />
+      </Menu>
       {formData.case_status === 'negative' && (
         <Card style={styles.radioCard}>
           <Card.Content>
@@ -798,13 +886,14 @@ export default function ProcessApplicationScreen({ route, navigation }) {
           <Text style={styles.radioGroupTitle}>Take photo*</Text>
           <RadioButton.Group
             onValueChange={(val) => {
+              updateFormData('photo_source', val);
               if (val === 'camera') {
                 console.log('Open camera');
               } else if (val === 'gallery') {
                 console.log('Open gallery');
               }
             }}
-            value=""
+            value={formData.photo_source}
           >
             <View style={styles.radioOption}>
               <RadioButton value="camera" />
@@ -915,43 +1004,54 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     return true;
   };
 
+  // Get header title - show applicant name or case ID
+  const getHeaderTitle = () => {
+    if (caseData?.applicant_name) {
+      return caseData.applicant_name;
+    }
+    if (caseData?.case_id) {
+      return caseData.case_id;
+    }
+    if (caseData?.reference_number) {
+      return caseData.reference_number;
+    }
+    return 'Process Application';
+  };
+
   return (
     <AppLayout>
-      <AppHeader title="Process Application" back navigation={navigation} />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {renderStepContent()}
-      </ScrollView>
-      <View style={styles.buttonContainer}>
+      <AppHeader title={getHeaderTitle()} back navigation={navigation} />
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+          {renderStepContent()}
+        </ScrollView>
         {currentStepIndex > 0 && (
-          <Button
-            mode="outlined"
+          <FAB
+            icon="arrow-left"
+            style={styles.fabLeft}
             onPress={() => changePage('pre')}
-            style={styles.backButton}
-            buttonColor={AppTheme.colors.surface}
-          >
-            Back
-          </Button>
+            color="white"
+            size="small"
+          />
         )}
         {step !== 'remark_submit' ? (
-          <Button
-            mode="contained"
+          <FAB
+            icon="arrow-right"
+            style={styles.fab}
             onPress={() => changePage('next')}
-            style={styles.nextButton}
-            buttonColor={AppTheme.colors.primary}
             disabled={!canProceed()}
-          >
-            Next
-          </Button>
+            color="white"
+            size="small"
+          />
         ) : (
-          <Button
-            mode="contained"
+          <FAB
+            icon="check"
+            style={styles.fab}
             onPress={handleSubmit}
-            style={styles.nextButton}
-            buttonColor={AppTheme.colors.primary}
             disabled={!canProceed()}
-          >
-            Submit
-          </Button>
+            color="white"
+            size="small"
+          />
         )}
       </View>
     </AppLayout>
@@ -959,12 +1059,15 @@ export default function ProcessApplicationScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
     padding: AppTheme.spacing.s,
-    paddingBottom: AppTheme.spacing.xl,
+    paddingBottom: 80, // Add padding to prevent content from being hidden behind FAB
   },
   sectionCard: {
     marginBottom: AppTheme.spacing.md,
@@ -1039,20 +1142,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: AppTheme.spacing.xs,
   },
-  buttonContainer: {
+  fab: {
+    position: 'absolute',
+    margin: 16,
+    right: 0,
+    bottom: 0,
+    backgroundColor: AppTheme.colors.primary,
+  },
+  fabLeft: {
+    position: 'absolute',
+    margin: 16,
+    left: 0,
+    bottom: 0,
+    backgroundColor: AppTheme.colors.primary,
+  },
+  dropdownInput: {
+    marginBottom: AppTheme.spacing.md,
+    borderWidth: 1,
+    borderColor: AppTheme.colors.outline,
+    borderRadius: AppTheme.roundness,
+    backgroundColor: AppTheme.colors.surface,
+  },
+  dropdownContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: AppTheme.spacing.md,
-    backgroundColor: AppTheme.colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: AppTheme.colors.outline,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    minHeight: 56,
   },
-  backButton: {
-    flex: 1,
-    marginRight: AppTheme.spacing.sm,
+  dropdownLabel: {
+    fontSize: 16,
+    color: AppTheme.colors.onSurface,
   },
-  nextButton: {
-    flex: 1,
-    marginLeft: AppTheme.spacing.sm,
+  dropdownPlaceholder: {
+    color: AppTheme.colors.onSurfaceVariant,
+  },
+  dropdownArrow: {
+    fontSize: 12,
+    color: AppTheme.colors.onSurfaceVariant,
   },
 });

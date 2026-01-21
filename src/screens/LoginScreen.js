@@ -1,17 +1,45 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Image, ScrollView } from 'react-native';
-import { TextInput, Button } from 'react-native-paper';
+import { TextInput, Button, Text } from 'react-native-paper';
 import { AppTheme } from '../theme/theme';
+import authService from '../services/authService';
 
 const logoImage = require('../assets/logo.png');
 
 export default function LoginScreen({ navigation }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('bijay@gmail.com');
+  const [password, setPassword] = useState('Password@123');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleLogin = () => {
-    // Navigate to Home screen after login
+  const handleLogin = async () => {
+    // Basic validation
+    if (!username || !password) {
+      setErrorMessage('Please enter both username and password.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+
+    const result = await authService.login(username, password);
+
+    setLoading(false);
+
+    if (!result.success) {
+      // Prefer backend message if available
+      const messageFromServer =
+        result?.error ||
+        result?.message ||
+        result?.data?.message ||
+        'Login failed. Please check your credentials.';
+
+      setErrorMessage(messageFromServer);
+      return;
+    }
+
+    // On success, navigate to main tabs
     navigation.replace('MainTabs');
   };
 
@@ -30,7 +58,7 @@ export default function LoginScreen({ navigation }) {
 
       <View style={styles.formContainer}>
         <TextInput
-          label="Username"
+          label="Email"
           value={username}
           onChangeText={setUsername}
           mode="outlined"
@@ -39,6 +67,10 @@ export default function LoginScreen({ navigation }) {
           autoCapitalize="none"
           autoCorrect={false}
         />
+
+        {errorMessage ? (
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        ) : null}
 
         <TextInput
           label="Password"
@@ -63,6 +95,8 @@ export default function LoginScreen({ navigation }) {
           buttonColor={AppTheme.colors.primary}
           textColor="#FFFFFF"
           labelStyle={styles.loginButtonLabel}
+          loading={loading}
+          disabled={loading}
         >
           Login
         </Button>
@@ -113,6 +147,10 @@ const styles = StyleSheet.create({
   input: {
     marginBottom: AppTheme.spacing.md,
     backgroundColor: AppTheme.colors.surface,
+  },
+  errorText: {
+    color: AppTheme.colors.error,
+    marginBottom: AppTheme.spacing.sm,
   },
   loginButton: {
     marginTop: AppTheme.spacing.lg,

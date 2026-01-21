@@ -1,138 +1,146 @@
-import React from 'react';
-import { ScrollView, StyleSheet, View, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Card, Text, Chip } from 'react-native-paper';
 import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
+import { CasesStorage } from '../utils/storage';
 
-const testCasesData = [
-  {
-    id: '1',
-    fullTitle: 'HDFC PFI PFI (PD)',
-    subtitle: 'Fl Type : Bv',
-    status: 'Accepted',
-    address: 'OFFICE PRIMARY HEALTH CARE, SURAJPUR PANCHKULA PANCHKULA 133301 A A 8926484848',
-    dateTime: 'Monday, June 10th 2024, 6:08:14 pm',
-  },
-  {
-    id: '2',
-    fullTitle: 'ICICI Bank Investigation',
-    subtitle: 'Fl Type : Cv',
-    status: 'Pending',
-    address: '123 MAIN STREET, BUSINESS DISTRICT, MUMBAI 400001, MAHARASHTRA 9876543210',
-    dateTime: 'Tuesday, June 11th 2024, 2:15:30 pm',
-  },
-  {
-    id: '3',
-    fullTitle: 'SBI Financial Review',
-    subtitle: 'Fl Type : Av',
-    status: 'Accepted',
-    address: '456 COMMERCIAL AVENUE, NEW DELHI 110001, DELHI 8765432109',
-    dateTime: 'Wednesday, June 12th 2024, 10:45:22 am',
-  },
-  {
-    id: '4',
-    fullTitle: 'Axis Bank Case Study',
-    subtitle: 'Fl Type : Bv',
-    status: 'Under Review',
-    address: '789 FINANCIAL PLAZA, BANGALORE 560001, KARNATAKA 7654321098',
-    dateTime: 'Thursday, June 13th 2024, 4:30:15 pm',
-  },
-  {
-    id: '5',
-    fullTitle: 'HDFC Credit Analysis',
-    subtitle: 'Fl Type : Dv',
-    status: 'Accepted',
-    address: '321 BANKING TOWER, CHENNAI 600001, TAMIL NADU 6543210987',
-    dateTime: 'Friday, June 14th 2024, 8:20:45 am',
-  },
-  {
-    id: '6',
-    fullTitle: 'Kotak Mahindra Inquiry',
-    subtitle: 'Fl Type : Bv',
-    status: 'Pending',
-    address: '654 FINANCE CENTER, HYDERABAD 500001, TELANGANA 5432109876',
-    dateTime: 'Saturday, June 15th 2024, 1:10:30 pm',
-  },
-  {
-    id: '7',
-    fullTitle: 'PNB Investigation Report',
-    subtitle: 'Fl Type : Cv',
-    status: 'Accepted',
-    address: '987 BUSINESS HUB, PUNE 411001, MAHARASHTRA 4321098765',
-    dateTime: 'Sunday, June 16th 2024, 5:55:20 pm',
-  },
-  {
-    id: '8',
-    fullTitle: 'Bank of Baroda Review',
-    subtitle: 'Fl Type : Av',
-    status: 'Under Review',
-    address: '147 BANKING SQUARE, AHMEDABAD 380001, GUJARAT 3210987654',
-    dateTime: 'Monday, June 17th 2024, 9:40:10 am',
-  },
-  {
-    id: '9',
-    fullTitle: 'Canara Bank Analysis',
-    subtitle: 'Fl Type : Bv',
-    status: 'Accepted',
-    address: '258 FINANCIAL DISTRICT, KOLKATA 700001, WEST BENGAL 2109876543',
-    dateTime: 'Tuesday, June 18th 2024, 3:25:55 pm',
-  },
-  {
-    id: '10',
-    fullTitle: 'Union Bank Case File',
-    subtitle: 'Fl Type : Dv',
-    status: 'Pending',
-    address: '369 COMMERCIAL ZONE, JAIPUR 302001, RAJASTHAN 1098765432',
-    dateTime: 'Wednesday, June 19th 2024, 11:15:40 am',
-  },
-];
+const formatCaseData = (caseObj) => {
+  // Format address from residence or business details
+  const residenceAddress = caseObj.residence_colony_details 
+    ? `${caseObj.residence_house_no || ''} ${caseObj.residence_colony_details}, ${caseObj.residence_city || ''}`.trim()
+    : '';
+  const businessAddress = caseObj.business_colony_details
+    ? `${caseObj.business_house_number || ''} ${caseObj.business_colony_details}, ${caseObj.business_city || ''}`.trim()
+    : '';
+  const address = businessAddress || residenceAddress || 'Address not available';
+
+  // Format date
+  const date = caseObj.created_at 
+    ? new Date(caseObj.created_at).toLocaleString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'Date not available';
+
+  // Get product name
+  const productName = caseObj.product?.name || caseObj.custom_name || caseObj.bank_product_name || 'N/A';
+  const bankName = caseObj.bank?.name || 'Unknown Bank';
+
+  return {
+    id: caseObj.id || caseObj.case_id || String(Math.random()),
+    fullTitle: `${bankName} ${productName}`,
+    subtitle: `Fl Type : ${caseObj.fl_type?.toUpperCase() || 'N/A'}`,
+    status: caseObj.status || 'Pending',
+    address: address,
+    dateTime: date,
+    caseData: caseObj, // Store full case data for navigation
+  };
+};
 
 export default function CaseList2Screen({ route, navigation }) {
   const { caseItem } = route.params || {};
+  const [casesToDisplay, setCasesToDisplay] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Always show multiple cases - if caseItem is passed, include it with test data
-  const casesToDisplay = caseItem 
-    ? [caseItem, ...testCasesData.filter(item => item.id !== caseItem.id)]
-    : testCasesData;
+  useEffect(() => {
+    const loadCases = async () => {
+      try {
+        setLoading(true);
+        let cases = [];
+
+        // If caseItem is passed and has cases array, use it directly
+        if (caseItem?.cases && Array.isArray(caseItem.cases)) {
+          cases = caseItem.cases;
+        } else {
+          // Otherwise, try to load from local storage and find matching cases
+          const { cases: storedCases } = await CasesStorage.getCasesData();
+          
+          if (storedCases && caseItem) {
+            // Find the matching case item from stored cases
+            const matchingItem = storedCases.find(
+              (item) => 
+                item.bank_name === caseItem.name && 
+                item.fl_type === caseItem.type
+            );
+            
+            if (matchingItem?.cases) {
+              cases = matchingItem.cases;
+            } else if (matchingItem?.rawData?.cases) {
+              cases = matchingItem.rawData.cases;
+            }
+          }
+        }
+
+        // Format cases for display
+        const formattedCases = cases.map(formatCaseData);
+        setCasesToDisplay(formattedCases);
+      } catch (error) {
+        console.error('Error loading cases:', error);
+        setCasesToDisplay([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadCases();
+  }, [caseItem]);
 
   return (
     <AppLayout>
       <AppHeader title="My Cases" back navigation={navigation} />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {casesToDisplay.map((caseData) => (
-          <TouchableOpacity
-            key={caseData.id}
-            onPress={() => navigation.navigate('ProcessApplication', { caseData })}
-            activeOpacity={0.7}
-          >
-            <Card style={styles.card}>
-              <Card.Content style={styles.cardContent}>
-              <View style={styles.headerRow}>
-                <Text style={styles.title}>{caseData.fullTitle || caseData.title}</Text>
-                <View style={styles.statusContainer}>
-                  <View style={styles.statusDot} />
-                  <Text style={styles.statusText}>{caseData.status}</Text>
-                </View>
-              </View>
-              
-              <Text style={styles.subtitle}>FL Type: {caseData.subtitle?.split(':')[1]?.trim() || 'bv'}</Text>
-              
-              <View style={styles.addressContainer}>
-                <Text style={styles.addressLabel}>Address:</Text>
-                <Text style={styles.addressText}>{caseData.address}</Text>
-              </View>
-              
-              <View style={styles.dateContainer}>
-                <Chip style={styles.dateChip} textStyle={styles.dateText}>
-                  {caseData.dateTime}
-                </Chip>
-              </View>
-            </Card.Content>
-          </Card>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {loading ? (
+        <ActivityIndicator
+          style={styles.loader}
+          animating
+          color={AppTheme.colors.primary}
+          size="large"
+        />
+      ) : (
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+          {casesToDisplay.length === 0 ? (
+            <Text style={styles.emptyText}>No cases found.</Text>
+          ) : (
+            casesToDisplay.map((caseData) => (
+              <TouchableOpacity
+                key={caseData.id}
+                onPress={() => navigation.navigate('ProcessApplication', { caseData: caseData.caseData || caseData })}
+                activeOpacity={0.7}
+              >
+                <Card style={styles.card}>
+                  <Card.Content style={styles.cardContent}>
+                    <View style={styles.headerRow}>
+                      <Text style={styles.title}>{caseData.fullTitle || caseData.title}</Text>
+                      <View style={styles.statusContainer}>
+                        <View style={styles.statusDot} />
+                        <Text style={styles.statusText}>{caseData.status}</Text>
+                      </View>
+                    </View>
+                    
+                    <Text style={styles.subtitle}>FL Type: {caseData.subtitle?.split(':')[1]?.trim() || 'N/A'}</Text>
+                    
+                    <View style={styles.addressContainer}>
+                      <Text style={styles.addressLabel}>Address:</Text>
+                      <Text style={styles.addressText}>{caseData.address}</Text>
+                    </View>
+                    
+                    <View style={styles.dateContainer}>
+                      <Chip style={styles.dateChip} textStyle={styles.dateText}>
+                        {caseData.dateTime}
+                      </Chip>
+                    </View>
+                  </Card.Content>
+                </Card>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      )}
     </AppLayout>
   );
 }
@@ -216,5 +224,17 @@ const styles = StyleSheet.create({
   dateText: {
     color: AppTheme.colors.surface,
     fontSize: AppTheme.typography.caption.fontSize,
+  },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: AppTheme.colors.onSurfaceVariant,
+    fontSize: AppTheme.typography.body.fontSize,
+    textAlign: 'center',
+    marginTop: AppTheme.spacing.xl,
+    padding: AppTheme.spacing.md,
   },
 });

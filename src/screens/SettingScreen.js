@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, Alert } from 'react-native';
 import { Card, TextInput, Switch, List, Button, Text, Divider } from 'react-native-paper';
 import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
+import authService from '../services/authService';
+import userService from '../services/userService';
 
 const renderNotificationSwitch = (value, onValueChange) => (
   <Switch
@@ -22,18 +24,69 @@ const renderBiometricSwitch = (value, onValueChange) => (
 );
 
 export default function SettingScreen({ navigation }) {
-  const [name, setName] = useState('John Doe');
-  const [phone, setPhone] = useState('+1 234 567 8900');
-  const [city, setCity] = useState('New York');
-  const [state, setState] = useState('NY');
-  const [zip, setZip] = useState('10001');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
 
-  const handleUpdateDetails = () => {
-    // Handle update user details action
-    console.log('Updating user details:', { name, phone, city, state, zip });
-    // Here you would typically save to storage/API
+  useEffect(() => {
+    // Load user data from storage
+    const loadUserData = async () => {
+      const user = await authService.getCurrentUser();
+      if (user) {
+        setFirstName(user.first_name || '');
+        setLastName(user.last_name || '');
+        setPhone(user.mobile_number || '');
+        setUsername(user.user_name || user.email || '');
+        setUserId(user.id);
+      }
+    };
+    loadUserData();
+  }, []);
+
+  const handleUpdateDetails = async () => {
+    if (!userId) {
+      Alert.alert('Error', 'User ID not found. Please login again.');
+      return;
+    }
+
+    // Basic validation
+    if (!firstName.trim() || !lastName.trim()) {
+      setErrorMessage('First name and last name are required.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMessage('');
+
+    const result = await userService.updateUser(userId, {
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      mobile_number: phone.trim(),
+    });
+
+    setLoading(false);
+
+    if (!result.success) {
+      const errorMsg =
+        result?.error ||
+        result?.data?.message ||
+        result?.data?.error ||
+        'Failed to update user details. Please try again.';
+      setErrorMessage(errorMsg);
+      return;
+    }
+
+    // Success - show alert and clear error
+    setErrorMessage('');
+    Alert.alert('Success', result.message || 'User details updated successfully', [
+      { text: 'OK' },
+    ]);
   };
 
   const handleLostCase = () => {
@@ -59,9 +112,19 @@ export default function SettingScreen({ navigation }) {
             <Divider style={styles.divider} />
             
             <TextInput
-              label="NAME"
-              value={name}
-              onChangeText={setName}
+              label="FIRST NAME"
+              value={firstName}
+              onChangeText={setFirstName}
+              mode="outlined"
+              style={styles.input}
+              contentStyle={styles.inputContent}
+              dense
+            />
+            
+            <TextInput
+              label="LAST NAME"
+              value={lastName}
+              onChangeText={setLastName}
               mode="outlined"
               style={styles.input}
               contentStyle={styles.inputContent}
@@ -80,43 +143,29 @@ export default function SettingScreen({ navigation }) {
             />
             
             <TextInput
-              label="CITY"
-              value={city}
-              onChangeText={setCity}
+              label="USERNAME"
+              value={username}
               mode="outlined"
               style={styles.input}
               contentStyle={styles.inputContent}
               dense
+              editable={false}
+              disabled
             />
             
-            <View style={styles.row}>
-              <TextInput
-                label="STATE"
-                value={state}
-                onChangeText={setState}
-                mode="outlined"
-                style={[styles.input, styles.halfWidth]}
-                contentStyle={styles.inputContent}
-                dense
-              />
-              
-              <TextInput
-                label="ZIP"
-                value={zip}
-                onChangeText={setZip}
-                mode="outlined"
-                keyboardType="numeric"
-                style={[styles.input, styles.halfWidth]}
-                contentStyle={styles.inputContent}
-                dense
-              />
-            </View>
+            {errorMessage ? (
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            ) : null}
             
             <Button
               mode="contained"
               onPress={handleUpdateDetails}
               style={styles.updateButton}
               buttonColor={AppTheme.colors.primary}
+              textColor={AppTheme.colors.surface}
+              icon="account-edit"
+              loading={loading}
+              disabled={loading}
               compact
             >
               Update Details
@@ -151,6 +200,7 @@ export default function SettingScreen({ navigation }) {
           style={styles.lostCaseButton}
           buttonColor={AppTheme.colors.primary}
           textColor={AppTheme.colors.surface}
+          icon="file-alert"
           compact
         >
           PUNCH LOS Case
@@ -219,16 +269,25 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: AppTheme.colors.onSurface,
   },
+  errorText: {
+    color: AppTheme.colors.error,
+    fontSize: AppTheme.typography.body.fontSize,
+    marginBottom: AppTheme.spacing.sm,
+    marginTop: AppTheme.spacing.xs,
+  },
   updateButton: {
     marginTop: AppTheme.spacing.sm,
     paddingVertical: AppTheme.spacing.xs,
+    borderRadius: AppTheme.roundness * 2,
   },
   lostCaseButton: {
     marginTop: AppTheme.spacing.md,
     paddingVertical: AppTheme.spacing.xs,
+    borderRadius: AppTheme.roundness * 2,
   },
   logoutButton: {
     marginTop: AppTheme.spacing.md,
     paddingVertical: AppTheme.spacing.xs,
+    borderRadius: AppTheme.roundness * 2,
   },
 });

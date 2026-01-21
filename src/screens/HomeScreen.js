@@ -5,6 +5,7 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
+import authService from '../services/authService';
 
 // Sample stats data
 const statsData = {
@@ -142,7 +143,7 @@ const AnimatedBar = ({ item, maxValue, index, delay = 0 }) => {
   );
 };
 
-const BarChart = ({ data, maxChartValue, key }) => {
+const BarChart = ({ data, maxChartValue, chartKey }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -153,7 +154,7 @@ const BarChart = ({ data, maxChartValue, key }) => {
       duration: 500,
       useNativeDriver: true,
     }).start();
-  }, [key, fadeAnim]);
+  }, [chartKey, fadeAnim]);
 
   return (
     <Animated.View
@@ -166,7 +167,7 @@ const BarChart = ({ data, maxChartValue, key }) => {
     >
       {data.map((item, index) => (
         <AnimatedBar
-          key={`${item.label}-${index}-${key}`}
+          key={`${item.label}-${index}-${chartKey}`}
           item={item}
           maxValue={maxChartValue}
           index={index}
@@ -180,7 +181,25 @@ const BarChart = ({ data, maxChartValue, key }) => {
 export default function HomeScreen() {
   const [viewType, setViewType] = useState('week');
   const [menuVisible, setMenuVisible] = useState(false);
-  const userName = 'Madan Lal Mahajan'; // This can be fetched from user context/state
+  const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const user = await authService.getCurrentUser();
+        if (user) {
+          const firstName = user.first_name || '';
+          const lastName = user.last_name || '';
+          const fullName = `${firstName} ${lastName}`.trim();
+          setUserName(fullName || user.user_name || user.email || '');
+        }
+      } catch (e) {
+        console.error('Failed to load user for HomeScreen:', e);
+      }
+    };
+
+    loadUser();
+  }, []);
 
   const chartData = viewType === 'week' ? weeklyData : monthlyData;
   const maxValue = Math.max(...chartData.map(d => d.value));
@@ -290,7 +309,11 @@ export default function HomeScreen() {
               </Menu>
             </View>
             <View style={styles.chartWrapper}>
-              <BarChart data={chartData} maxChartValue={maxValue} key={viewType} />
+              <BarChart
+                data={chartData}
+                maxChartValue={maxValue}
+                chartKey={viewType}
+              />
             </View>
           </Card.Content>
         </Card>
