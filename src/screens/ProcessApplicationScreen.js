@@ -6,6 +6,7 @@ import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
 import { confirmDeleteImage, takePhotoWithGeoAndCompression, pickImageFromGallery } from '../utils/locationHelpers';
 import { generateTestData } from '../utils/testDataGenerator';
+import { submitCaseData, uploadCaseFiles } from '../services/casesService';
 
 // Helper function to format file size
 const formatFileSize = (bytes) => {
@@ -1419,7 +1420,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     console.log('========== FORM SUBMISSION DATA ==========');
     console.log('Case Data:', JSON.stringify(caseData, null, 2));
     console.log('Form Data:', JSON.stringify(formData, null, 2));
@@ -1428,9 +1429,44 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     console.log('Total Location Pictures:', formData.locationPictures.length);
     console.log('Photo Source:', formData.photo_source);
     console.log('==========================================');
-    
-    // Handle form submission
-    navigation.goBack();
+
+    try {
+      const caseId = caseData?.case_id || caseData?.id;
+      if (!caseId) {
+        Alert.alert('Error', 'Case ID is missing. Cannot submit.');
+        return;
+      }
+
+      const caseDataToSubmit = {};
+      for (const key in formData) {
+        if (key === 'locationPictures') {
+          continue;
+        }
+        caseDataToSubmit[key] = formData[key];
+      }
+
+      caseDataToSubmit.case_id = caseId;
+      if (caseData?.id) {
+        caseDataToSubmit.id = caseData.id;
+      }
+
+      const caseResult = await submitCaseData(caseDataToSubmit);
+      if (!caseResult.success) {
+        Alert.alert('Error', caseResult.error || 'Failed to submit case data.');
+        return;
+      }
+
+      // No API call for file upload for now - just log file paths
+      const images = formData.locationPictures || [];
+      await uploadCaseFiles(caseId, images);
+
+      Alert.alert('Success', 'Case submitted successfully.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (error) {
+      console.error('Submit error:', error);
+      Alert.alert('Error', error.message || 'Oops, some error occurred. Please try after some time.');
+    }
   };
 
   const canProceed = () => {
