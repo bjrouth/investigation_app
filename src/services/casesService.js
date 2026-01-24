@@ -3,7 +3,9 @@
  * Handles case-related API operations
  */
 import api from './api';
-import { API_ENDPOINTS, buildApiUrl } from '../constants/config';
+import { API_ENDPOINTS, API_URL, buildApiUrl } from '../constants/config';
+import RNFS from 'react-native-fs';
+import { TokenStorage } from '../utils/storage';
 
 /**
  * Get employee cases with optional filters
@@ -152,13 +154,98 @@ export const submitCaseData = async (caseData) => {
  * Logs file paths only (no API call)
  */
 export const uploadCaseFiles = async (caseId, files = []) => {
-  console.log('Skipping file upload for now.');
-  console.log('Case ID:', caseId);
-  console.log('Files to upload:', files.map((file) => file?.uri || file?.path || file));
-  return {
-    success: true,
-    data: { skipped: true, count: files.length },
-  };
+  try {
+    const token = await TokenStorage.getAccessToken();
+    const uploadFiles = files
+      .map((file, index) => {
+        const rawPath = file?.uri || file?.path || '';
+        const filePath = rawPath.replace('file://', '');
+        const filename = file?.name || `case_${Date.now()}_${index}.jpg`;
+        const filetype = file?.type || 'image/jpeg';
+
+        if (!filePath || filePath.startsWith('http://') || filePath.startsWith('https://')) {
+          console.warn('Skipping invalid file path:', { rawPath, filePath });
+          return null;
+        }
+
+        return {
+          name: 'files[]',
+          filename,
+          filepath: filePath,
+          filetype,
+        };
+      })
+      .filter(Boolean);
+
+    if (uploadFiles.length === 0) {
+      return {
+        success: false,
+        error: 'No valid files to upload',
+      };
+    }
+
+    console.log('Uploading files with RNFS:', {
+      caseId,
+      count: uploadFiles.length,
+      paths: uploadFiles.map((f) => f.filepath),
+    });
+
+    const geoSource = files.find(
+      (file) => file?.latitude && file?.longitude
+    );
+    const fields = {
+      case_id: String(caseId),
+      type: 'response',
+    };
+    if (geoSource?.latitude && geoSource?.longitude) {
+      fields.latitude = String(geoSource.latitude);
+      fields.longitude = String(geoSource.longitude);
+      if (geoSource.accuracy) {
+        fields.accuracy = String(geoSource.accuracy);
+      }
+      if (geoSource.address) {
+        fields.address = String(geoSource.address);
+      }
+    }
+
+    const response = await RNFS.uploadFiles({
+      toUrl: `${API_URL}cases/upload-files`,
+      files: uploadFiles,
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      fields,
+    }).promise;
+
+    let responseBody = null;
+    try {
+      responseBody = response?.bodyString ? JSON.parse(response.bodyString) : null;
+    } catch (parseError) {
+      responseBody = response?.bodyString || null;
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return {
+        success: false,
+        error: responseBody?.message || 'Failed to upload files',
+        status: response.statusCode,
+        data: responseBody,
+      };
+    }
+
+    return {
+      success: true,
+      data: responseBody,
+      status: response.statusCode,
+    };
+  } catch (error) {
+    console.error('Upload files error:', error);
+    return {
+      success: false,
+      error: error?.message || 'Failed to upload files',
+    };
+  }
 };
 
 export default {

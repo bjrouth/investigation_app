@@ -1431,7 +1431,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     console.log('==========================================');
 
     try {
-      const caseId = caseData?.case_id || caseData?.id;
+      const caseId = caseData?.id || caseData?.case_id;
       if (!caseId) {
         Alert.alert('Error', 'Case ID is missing. Cannot submit.');
         return;
@@ -1458,7 +1458,9 @@ export default function ProcessApplicationScreen({ route, navigation }) {
 
       // No API call for file upload for now - just log file paths
       const images = formData.locationPictures || [];
-      await uploadCaseFiles(caseId, images);
+      // Use the same case id as submit-case (prefer numeric id)
+      const uploadCaseId = caseData?.id || caseId;
+      await uploadCaseFiles(uploadCaseId, images);
 
       Alert.alert('Success', 'Case submitted successfully.', [
         { text: 'OK', onPress: () => navigation.goBack() },

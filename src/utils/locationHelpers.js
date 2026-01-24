@@ -6,6 +6,7 @@ import Geolocation from '@react-native-community/geolocation';
 import Geocoder from 'react-native-geocoding';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import ImageResizer from 'react-native-image-resizer';
+import ImageMarker, { Position, TextBackgroundType } from 'react-native-image-marker';
 import RNFS from 'react-native-fs';
 import { Alert, Platform, PermissionsAndroid } from 'react-native';
 import { API_CONFIG } from '../constants/config';
@@ -177,6 +178,62 @@ const requestCameraPermission = async () => {
   }
 };
 
+const buildGeoStampText = (location, address) => {
+  if (!location?.latitude || !location?.longitude) return '';
+  const parts = [
+    `Lat: ${location.latitude.toFixed(6)}`,
+    `Lng: ${location.longitude.toFixed(6)}`,
+  ];
+  if (address && address !== 'Location unavailable') {
+    parts.push(`Addr: ${address}`);
+  }
+  parts.push(`Time: ${new Date().toISOString()}`);
+  return parts.join('\n');
+};
+
+const addGeoStampToImage = async (uri, location, address) => {
+  const text = buildGeoStampText(location, address);
+  if (!text) return uri;
+
+  try {
+    const stampedPath = await ImageMarker.markText({
+      backgroundImage: {
+        src: uri,
+      },
+      watermarkTexts: [
+        {
+          text,
+          position: {
+            position: Position.bottomRight,
+          },
+          style: {
+            color: '#FFFFFF',
+            fontSize: 22,
+            textAlign: 'right',
+            textBackgroundStyle: {
+              type: TextBackgroundType.stretchX,
+              color: 'rgba(0, 0, 0, 0.6)',
+              paddingX: 12,
+              paddingY: 8,
+              cornerRadius: {
+                all: { x: 8, y: 8 },
+              },
+            },
+          },
+        },
+      ],
+      scale: 1,
+      quality: 100,
+    });
+
+    if (!stampedPath) return uri;
+    return stampedPath.startsWith('file://') ? stampedPath : `file://${stampedPath}`;
+  } catch (error) {
+    console.warn('Failed to add geo stamp to image:', error);
+    return uri;
+  }
+};
+
 /**
  * Take photo with camera, compress, and get geolocation
  * @returns {Promise<Object>} Image data with location (location may be null if unavailable)
@@ -252,6 +309,9 @@ export const takePhotoWithGeoAndCompression = async () => {
     } catch (error) {
       console.warn('Location not available, continuing without geolocation:', error);
     }
+
+    // 4️⃣ Add geo stamp on image if location is available
+    compressedUri = await addGeoStampToImage(compressedUri, location, address);
 
     // Get file size of compressed image and validate
     let fileSize = result.fileSize;
