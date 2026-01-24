@@ -40,12 +40,18 @@ export const buildApiUrl = (endpoint) => {
   return `${API_URL}${endpoint}`;
 };
 
+// Google Maps API Configuration (for geocoding)
+export const API_CONFIG = {
+  GOOGLE_MAPS_API_KEY: 'AIzaSyB6v427807anseD365HCUEhveDSULheuCg', // Add your Google Maps API key here
+};
+
 // Export default config object
 const config = {
   API_URL,
   ENV,
   API_ENDPOINTS,
   buildApiUrl,
+  API_CONFIG,
 };
 
 export default config;
