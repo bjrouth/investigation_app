@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, TouchableOpacity, Image, Alert, Modal, Dimensions } from 'react-native';
+import { ScrollView, StyleSheet, View, TouchableOpacity, Image, Alert, Modal, Dimensions, ActivityIndicator } from 'react-native';
 import { Card, Text, TextInput, Button, RadioButton, FAB, Menu, TouchableRipple, IconButton } from 'react-native-paper';
 import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
@@ -7,6 +7,7 @@ import { AppTheme } from '../theme/theme';
 import { confirmDeleteImage, takePhotoWithGeoAndCompression, pickImageFromGallery } from '../utils/locationHelpers';
 import { generateTestData } from '../utils/testDataGenerator';
 import { submitCaseData, uploadCaseFiles } from '../services/casesService';
+import { CasesStorage } from '../utils/storage';
 
 // Helper function to format file size
 const formatFileSize = (bytes) => {
@@ -47,6 +48,9 @@ export default function ProcessApplicationScreen({ route, navigation }) {
   
   // Image source menu state
   const [imageSourceMenuVisible, setImageSourceMenuVisible] = useState(false);
+
+  // Submission loader state
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Generate default test data based on case type
   const getDefaultFormData = () => {
@@ -1431,6 +1435,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     console.log('==========================================');
 
     try {
+      setIsSubmitting(true);
       const caseId = caseData?.id || caseData?.case_id;
       if (!caseId) {
         Alert.alert('Error', 'Case ID is missing. Cannot submit.');
@@ -1456,11 +1461,20 @@ export default function ProcessApplicationScreen({ route, navigation }) {
         return;
       }
 
-      // No API call for file upload for now - just log file paths
       const images = formData.locationPictures || [];
       // Use the same case id as submit-case (prefer numeric id)
       const uploadCaseId = caseData?.id || caseId;
-      await uploadCaseFiles(uploadCaseId, images);
+      let uploadResult = { success: true };
+      if (images.length > 0) {
+        uploadResult = await uploadCaseFiles(uploadCaseId, images);
+      }
+
+      if (!uploadResult.success) {
+        Alert.alert('Error', uploadResult.error || 'File upload failed.');
+        return;
+      }
+
+      await CasesStorage.removeCaseById(caseId);
 
       Alert.alert('Success', 'Case submitted successfully.', [
         { text: 'OK', onPress: () => navigation.goBack() },
@@ -1468,6 +1482,8 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     } catch (error) {
       console.error('Submit error:', error);
       Alert.alert('Error', error.message || 'Oops, some error occurred. Please try after some time.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1506,6 +1522,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             onPress={() => changePage('pre')}
             color="white"
             size="small"
+            disabled={isSubmitting}
           />
         )}
         {step !== 'remark_submit' ? (
@@ -1513,7 +1530,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             icon="arrow-right"
             style={styles.fab}
             onPress={() => changePage('next')}
-            disabled={!canProceed()}
+            disabled={!canProceed() || isSubmitting}
             color="white"
             size="small"
           />
@@ -1522,7 +1539,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             icon="check"
             style={styles.fab}
             onPress={handleSubmit}
-            disabled={!canProceed()}
+            disabled={!canProceed() || isSubmitting}
             color="white"
             size="small"
           />
@@ -1600,6 +1617,16 @@ export default function ProcessApplicationScreen({ route, navigation }) {
           )}
         </View>
       </Modal>
+
+      {/* Submission Loader */}
+      <Modal visible={isSubmitting} transparent animationType="fade">
+        <View style={styles.submittingOverlay}>
+          <View style={styles.submittingCard}>
+            <ActivityIndicator size="large" color={AppTheme.colors.primary} />
+            <Text style={styles.submittingText}>Submitting case...</Text>
+          </View>
+        </View>
+      </Modal>
     </AppLayout>
   );
 }
@@ -1614,6 +1641,26 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: AppTheme.spacing.s,
     paddingBottom: 80, // Add padding to prevent content from being hidden behind FAB
+  },
+  submittingOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submittingCard: {
+    backgroundColor: AppTheme.colors.surface,
+    paddingVertical: AppTheme.spacing.lg,
+    paddingHorizontal: AppTheme.spacing.xl,
+    borderRadius: AppTheme.roundness,
+    alignItems: 'center',
+    minWidth: 220,
+  },
+  submittingText: {
+    marginTop: AppTheme.spacing.sm,
+    fontSize: AppTheme.typography.body.fontSize,
+    color: AppTheme.colors.onSurface,
+    fontWeight: '600',
   },
   sectionCard: {
     marginBottom: AppTheme.spacing.md,

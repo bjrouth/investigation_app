@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Card, Text, Chip } from 'react-native-paper';
 import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
 import { CasesStorage } from '../utils/storage';
+import { useFocusEffect } from '@react-navigation/native';
 
 const formatCaseData = (caseObj) => {
   // Format address from residence or business details
@@ -48,48 +49,54 @@ export default function CaseList2Screen({ route, navigation }) {
   const [casesToDisplay, setCasesToDisplay] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const loadCases = async () => {
-      try {
-        setLoading(true);
-        let cases = [];
+  const loadCases = useCallback(async () => {
+    try {
+      setLoading(true);
+      let cases = [];
 
-        // If caseItem is passed and has cases array, use it directly
-        if (caseItem?.cases && Array.isArray(caseItem.cases)) {
-          cases = caseItem.cases;
-        } else {
-          // Otherwise, try to load from local storage and find matching cases
-          const { cases: storedCases } = await CasesStorage.getCasesData();
+      // If caseItem is passed and has cases array, use it directly
+      if (caseItem?.cases && Array.isArray(caseItem.cases)) {
+        cases = caseItem.cases;
+      } else {
+        // Otherwise, try to load from local storage and find matching cases
+        const { cases: storedCases } = await CasesStorage.getCasesData();
+        
+        if (storedCases && caseItem) {
+          // Find the matching case item from stored cases
+          const matchingItem = storedCases.find(
+            (item) => 
+              item.bank_name === caseItem.name && 
+              item.fl_type === caseItem.type
+          );
           
-          if (storedCases && caseItem) {
-            // Find the matching case item from stored cases
-            const matchingItem = storedCases.find(
-              (item) => 
-                item.bank_name === caseItem.name && 
-                item.fl_type === caseItem.type
-            );
-            
-            if (matchingItem?.cases) {
-              cases = matchingItem.cases;
-            } else if (matchingItem?.rawData?.cases) {
-              cases = matchingItem.rawData.cases;
-            }
+          if (matchingItem?.cases) {
+            cases = matchingItem.cases;
+          } else if (matchingItem?.rawData?.cases) {
+            cases = matchingItem.rawData.cases;
           }
         }
-
-        // Format cases for display
-        const formattedCases = cases.map(formatCaseData);
-        setCasesToDisplay(formattedCases);
-      } catch (error) {
-        console.error('Error loading cases:', error);
-        setCasesToDisplay([]);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    loadCases();
+      // Format cases for display
+      const formattedCases = cases.map(formatCaseData);
+      setCasesToDisplay(formattedCases);
+    } catch (error) {
+      console.error('Error loading cases:', error);
+      setCasesToDisplay([]);
+    } finally {
+      setLoading(false);
+    }
   }, [caseItem]);
+
+  useEffect(() => {
+    loadCases();
+  }, [loadCases]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCases();
+    }, [loadCases]),
+  );
 
   return (
     <AppLayout>

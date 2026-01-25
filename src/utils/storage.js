@@ -181,6 +181,68 @@ export const CasesStorage = {
       return false;
     }
   },
+
+  /**
+   * Remove a single case by id/case_id from stored cases
+   */
+  removeCaseById: async (caseId) => {
+    try {
+      if (caseId === null || caseId === undefined || caseId === '') {
+        return { success: false, removedCount: 0 };
+      }
+
+      const targetId = String(caseId);
+      const { cases: storedCases } = await CasesStorage.getCasesData();
+
+      if (!storedCases || !Array.isArray(storedCases)) {
+        return { success: false, removedCount: 0 };
+      }
+
+      let removedCount = 0;
+      const shouldKeepCase = (caseObj) => {
+        const idValue = caseObj?.id ?? caseObj?.case_id;
+        const caseIdValue = caseObj?.case_id ?? caseObj?.id;
+        return String(idValue) !== targetId && String(caseIdValue) !== targetId;
+      };
+
+      const updatedCases = storedCases.reduce((acc, item) => {
+        const itemCases = Array.isArray(item?.cases) ? item.cases : [];
+        const filteredCases = itemCases.filter(shouldKeepCase);
+        removedCount += itemCases.length - filteredCases.length;
+
+        const rawCases = Array.isArray(item?.rawData?.cases) ? item.rawData.cases : null;
+        const updatedRawData = item?.rawData
+          ? {
+              ...item.rawData,
+              cases: rawCases ? rawCases.filter(shouldKeepCase) : item.rawData.cases,
+            }
+          : item.rawData;
+
+        if (filteredCases.length > 0) {
+          acc.push({
+            ...item,
+            cases: filteredCases,
+            caseCount: filteredCases.length,
+            rawData: updatedRawData,
+          });
+        }
+
+        return acc;
+      }, []);
+
+      const totalCases = updatedCases.reduce(
+        (sum, item) => sum + (item.caseCount || item.cases?.length || 0),
+        0,
+      );
+
+      await CasesStorage.setCasesData(updatedCases, totalCases);
+
+      return { success: true, removedCount, cases: updatedCases, totalCases };
+    } catch (error) {
+      console.error('Error removing case by id:', error);
+      return { success: false, removedCount: 0 };
+    }
+  },
 };
 
 /**

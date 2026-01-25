@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Card, Avatar, IconButton, ActivityIndicator, Text, FAB } from 'react-native-paper';
 import AppLayout from '../components/AppLayout';
@@ -7,6 +7,7 @@ import { AppTheme } from '../theme/theme';
 import authService from '../services/authService';
 import casesService from '../services/casesService';
 import { CasesStorage } from '../utils/storage';
+import { useFocusEffect } from '@react-navigation/native';
 
 const renderLeftIcon = (caseCount) => (props) => (
   <View style={styles.iconContainer}>
@@ -127,6 +128,12 @@ export default function CasesScreen({ navigation }) {
     loadCases();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadCasesFromStorage();
+    }, []),
+  );
 
   const handleRefresh = async () => {
     // Always fetch from API when refresh is pressed
