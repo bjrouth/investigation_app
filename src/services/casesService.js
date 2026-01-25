@@ -69,6 +69,61 @@ export const getEmployeeCases = async ({ userId, bank, type } = {}) => {
 };
 
 /**
+ * Get employee completed cases with optional date filter
+ * GET /api/cases/employee-completed-cases?user_id={id}&selectedDate={date}
+ *
+ * @param {Object} params
+ * @param {number|string} params.userId - Employee/user ID
+ * @param {string} [params.selectedDate] - Optional date filter (YYYY-MM-DD)
+ * @returns {Promise<Object>} - { success, cases, error, status }
+ */
+export const getEmployeeCompletedCases = async ({ userId, selectedDate } = {}) => {
+  try {
+    if (!userId) {
+      throw new Error('userId is required to fetch employee completed cases');
+    }
+
+    const searchParams = new URLSearchParams();
+    searchParams.append('user_id', String(userId));
+
+    if (selectedDate) {
+      searchParams.append('selectedDate', selectedDate);
+    }
+
+    const url = `${API_ENDPOINTS.EMPLOYEE_COMPLETED_CASES}?${searchParams.toString()}`;
+    const response = await api.get(buildApiUrl(url));
+
+    const data = response.data || {};
+    let cases = [];
+    if (Array.isArray(data)) {
+      cases = data;
+    } else if (Array.isArray(data.cases)) {
+      cases = data.cases;
+    } else if (Array.isArray(data.data)) {
+      cases = data.data;
+    }
+
+    return {
+      success: true,
+      cases,
+      raw: data,
+    };
+  } catch (error) {
+    console.error('Get employee completed cases error:', error);
+    return {
+      success: false,
+      error:
+        error?.data?.message ||
+        error?.data?.error ||
+        error?.message ||
+        'Failed to fetch completed cases',
+      status: error.status,
+      data: error.data,
+    };
+  }
+};
+
+/**
  * Submit case form data as FormData
  * POST /api/submit-case
  *

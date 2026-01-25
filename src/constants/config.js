@@ -28,6 +28,7 @@ export const API_ENDPOINTS = {
   CASE_DETAIL: (id) => `cases/${id}`,
   SUBMIT_CASE: (id) => `cases/${id}/submit`,
   EMPLOYEE_CASES: 'cases/employee-case',
+  EMPLOYEE_COMPLETED_CASES: 'cases/employee-completed-cases',
   
   // User endpoints
   PROFILE: 'user/profile',
