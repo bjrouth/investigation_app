@@ -8,6 +8,7 @@ import authService from '../services/authService';
 import casesService from '../services/casesService';
 import { CasesStorage } from '../utils/storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { getDraftCases } from '../services/caseStorageService';
 
 const renderLeftIcon = (caseCount) => (props) => (
   <View style={styles.iconContainer}>
@@ -52,6 +53,48 @@ export default function CasesScreen({ navigation }) {
     return normalizedCases;
   };
 
+  const getDraftCaseIds = async () => {
+    try {
+      const drafts = await getDraftCases();
+      return new Set(
+        drafts
+          .map((item) => String(item.id || item.case_id))
+          .filter((value) => value && value !== 'undefined' && value !== 'null'),
+      );
+    } catch (error) {
+      console.error('Failed to load draft cases:', error);
+      return new Set();
+    }
+  };
+
+  const filterOutDrafts = (caseList, draftIds) => {
+    if (!draftIds || draftIds.size === 0) return caseList;
+    return caseList
+      .map((group) => {
+        const filteredCases = Array.isArray(group.cases)
+          ? group.cases.filter((caseItem) => {
+              const id = String(caseItem?.id || caseItem?.case_id || '');
+              return id && !draftIds.has(id);
+            })
+          : [];
+
+        if (filteredCases.length === 0) {
+          return null;
+        }
+
+        return {
+          ...group,
+          cases: filteredCases,
+          caseCount: filteredCases.length,
+          rawData: {
+            ...group.rawData,
+            cases: filteredCases,
+          },
+        };
+      })
+      .filter(Boolean);
+  };
+
   const fetchCases = async (isRefresh = false) => {
     try {
       if (isRefresh) {
@@ -60,6 +103,7 @@ export default function CasesScreen({ navigation }) {
         setLoading(true);
       }
 
+      const draftIds = await getDraftCaseIds();
       const user = await authService.getCurrentUser();
       if (!user?.id) {
         setErrorMessage('User not found. Please login again.');
@@ -81,14 +125,18 @@ export default function CasesScreen({ navigation }) {
       } else {
         // Normalize cases to match UI expectations
         const normalizedCases = normalizeCases(result.raw.formatted_data);
-        const casesTotal = result.raw.total_cases;
+        const filteredCases = filterOutDrafts(normalizedCases, draftIds);
+        const casesTotal = filteredCases.reduce(
+          (sum, item) => sum + (item.caseCount || item.cases?.length || 0),
+          0,
+        );
 
-        setCases(normalizedCases);
+        setCases(filteredCases);
         setTotalCases(casesTotal);
         setErrorMessage('');
 
         // Save to local storage
-        await CasesStorage.setCasesData(normalizedCases, casesTotal);
+        await CasesStorage.setCasesData(filteredCases, casesTotal);
       }
     } catch (e) {
       setErrorMessage('An unexpected error occurred while loading cases.');
@@ -103,8 +151,14 @@ export default function CasesScreen({ navigation }) {
     try {
       const { cases: storedCases, totalCases: storedTotalCases } = await CasesStorage.getCasesData();
       if (storedCases && storedCases.length > 0) {
-        setCases(storedCases);
-        setTotalCases(storedTotalCases);
+        const draftIds = await getDraftCaseIds();
+        const filteredCases = filterOutDrafts(storedCases, draftIds);
+        const casesTotal = filteredCases.reduce(
+          (sum, item) => sum + (item.caseCount || item.cases?.length || 0),
+          0,
+        );
+        setCases(filteredCases);
+        setTotalCases(casesTotal);
         setLoading(false);
         return true;
       }

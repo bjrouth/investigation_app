@@ -7,6 +7,13 @@ import { AppTheme } from '../theme/theme';
 import { confirmDeleteImage, takePhotoWithGeoAndCompression, pickImageFromGallery } from '../utils/locationHelpers';
 import { generateTestData } from '../utils/testDataGenerator';
 import { submitCaseData, uploadCaseFiles } from '../services/casesService';
+import NetInfo from '@react-native-community/netinfo';
+import {
+  saveCaseMetadata,
+  saveCaseForm,
+  saveCaseImage,
+  updateCaseStatus,
+} from '../services/caseStorageService';
 import { CasesStorage } from '../utils/storage';
 
 // Helper function to format file size
@@ -1434,7 +1441,57 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     console.log('Photo Source:', formData.photo_source);
     console.log('==========================================');
 
+    const saveDraftLocally = async () => {
+      const caseId = caseData?.id || caseData?.case_id;
+      if (!caseId) {
+        throw new Error('Case ID is missing. Cannot save draft.');
+      }
+
+      const localCaseId = String(caseId);
+      await saveCaseMetadata({
+        id: localCaseId,
+        reference_number: caseData?.reference_number,
+        case_id: caseData?.case_id || localCaseId,
+        current_step: step,
+      });
+
+      const formPayload = {
+        ...caseData,
+        ...formData,
+        locationPictures: [],
+      };
+      await saveCaseForm(localCaseId, formPayload);
+
+      const images = formData.locationPictures || [];
+      for (const image of images) {
+        try {
+          await saveCaseImage(localCaseId, image);
+        } catch (error) {
+          console.warn('Failed to save image for draft:', error);
+        }
+      }
+
+      await updateCaseStatus(localCaseId, 'DRAFTED');
+      await CasesStorage.removeCaseById(caseId);
+    };
+
+    const isNetworkError = (errorLike) => {
+      const message = String(errorLike?.error || errorLike?.message || '');
+      return !errorLike?.status && message.toLowerCase().includes('network');
+    };
+
     try {
+      const networkState = await NetInfo.fetch();
+      const hasInternet = !!networkState?.isConnected && networkState?.isInternetReachable !== false;
+      if (!hasInternet) {
+        setIsSubmitting(true);
+        await saveDraftLocally();
+        Alert.alert('Offline', 'No internet connection. Case saved as Draft in History.', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+        return;
+      }
+
       setIsSubmitting(true);
       const caseId = caseData?.id || caseData?.case_id;
       if (!caseId) {
@@ -1457,6 +1514,13 @@ export default function ProcessApplicationScreen({ route, navigation }) {
 
       const caseResult = await submitCaseData(caseDataToSubmit);
       if (!caseResult.success) {
+        if (isNetworkError(caseResult)) {
+          await saveDraftLocally();
+          Alert.alert('Offline', 'No internet connection. Case saved as Draft in History.', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+          return;
+        }
         Alert.alert('Error', caseResult.error || 'Failed to submit case data.');
         return;
       }
@@ -1470,6 +1534,13 @@ export default function ProcessApplicationScreen({ route, navigation }) {
       }
 
       if (!uploadResult.success) {
+        if (isNetworkError(uploadResult)) {
+          await saveDraftLocally();
+          Alert.alert('Offline', 'No internet connection. Case saved as Draft in History.', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+          return;
+        }
         Alert.alert('Error', uploadResult.error || 'File upload failed.');
         return;
       }
@@ -1481,6 +1552,17 @@ export default function ProcessApplicationScreen({ route, navigation }) {
       ]);
     } catch (error) {
       console.error('Submit error:', error);
+      if (isNetworkError(error)) {
+        try {
+          await saveDraftLocally();
+          Alert.alert('Offline', 'No internet connection. Case saved as Draft in History.', [
+            { text: 'OK', onPress: () => navigation.goBack() },
+          ]);
+          return;
+        } catch (saveError) {
+          console.error('Failed to save draft locally:', saveError);
+        }
+      }
       Alert.alert('Error', error.message || 'Oops, some error occurred. Please try after some time.');
     } finally {
       setIsSubmitting(false);

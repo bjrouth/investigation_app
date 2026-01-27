@@ -10,6 +10,7 @@ import ImageMarker, { Position, TextBackgroundType } from 'react-native-image-ma
 import RNFS from 'react-native-fs';
 import { Alert, Platform, PermissionsAndroid } from 'react-native';
 import { API_CONFIG } from '../constants/config';
+import NetInfo from '@react-native-community/netinfo';
 
 // Initialize Geocoder with API key if available
 if (API_CONFIG?.GOOGLE_MAPS_API_KEY) {
@@ -179,16 +180,28 @@ const requestCameraPermission = async () => {
 };
 
 const buildGeoStampText = (location, address) => {
-  if (!location?.latitude || !location?.longitude) return '';
-  const parts = [
-    `Lat: ${location.latitude.toFixed(6)}`,
-    `Lng: ${location.longitude.toFixed(6)}`,
-  ];
+  const parts = [];
+  if (location?.latitude && location?.longitude) {
+    parts.push(`Lat: ${location.latitude.toFixed(6)}`);
+    parts.push(`Lng: ${location.longitude.toFixed(6)}`);
+  }
   if (address && address !== 'Location unavailable') {
     parts.push(`Addr: ${address}`);
   }
+  if (parts.length === 0) return '';
   parts.push(`Time: ${new Date().toISOString()}`);
   return parts.join('\n');
+};
+
+const getOfflineAddress = async () => {
+  try {
+    const state = await NetInfo.fetch();
+    const ipAddress = state?.details?.ipAddress;
+    return ipAddress ? `IP: ${ipAddress}` : 'IP: unavailable';
+  } catch (error) {
+    console.warn('Failed to get IP address:', error);
+    return 'IP: unavailable';
+  }
 };
 
 const addGeoStampToImage = async (uri, location, address) => {
@@ -299,8 +312,12 @@ export const takePhotoWithGeoAndCompression = async () => {
     let address = 'Location unavailable';
     
     try {
+      const networkState = await NetInfo.fetch();
+      const hasInternet = !!networkState?.isConnected && networkState?.isInternetReachable !== false;
       location = await getCurrentLocation(8000); // 8 second timeout
-      if (location) {
+      if (!hasInternet) {
+        address = await getOfflineAddress();
+      } else if (location) {
         address = await getAddressFromCoords(
           location.latitude,
           location.longitude

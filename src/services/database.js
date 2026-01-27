@@ -12,15 +12,24 @@ let db = null;
 /**
  * Initialize and open the database
  */
+const ensureDatabase = () => {
+  if (db) {
+    return db;
+  }
+
+  db = open({
+    name: DATABASE_NAME,
+    location: 'default',
+  });
+
+  // Create tables if they don't exist
+  createTables();
+  return db;
+};
+
 export const initDatabase = async () => {
   try {
-    db = open({
-      name: DATABASE_NAME,
-      location: 'default',
-    });
-
-    // Create tables if they don't exist
-    createTables();
+    ensureDatabase();
     console.log('Database initialized successfully');
     return db;
   } catch (error) {
@@ -88,10 +97,11 @@ const createTables = () => {
  * Get database instance
  */
 export const getDatabase = () => {
-  if (!db) {
+  try {
+    return ensureDatabase();
+  } catch (error) {
     throw new Error('Database not initialized. Call initDatabase() first.');
   }
-  return db;
 };
 
 /**

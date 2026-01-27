@@ -4,8 +4,14 @@
  */
 import { getDatabase } from './database';
 import * as FileStorage from './fileStorage';
-import api from './api';
-import { API_ENDPOINTS } from '../constants/config';
+import { submitCaseData, uploadCaseFiles } from './casesService';
+
+const getRowsArray = (result) => {
+  if (!result || !result.rows) return [];
+  if (Array.isArray(result.rows)) return result.rows;
+  if (Array.isArray(result.rows._array)) return result.rows._array;
+  return [];
+};
 
 /**
  * Save case metadata
@@ -155,11 +161,12 @@ export const loadCase = async (caseId) => {
       [caseId, caseId]
     );
 
-    if (!caseResult.rows || caseResult.rows.length === 0) {
+    const caseRows = getRowsArray(caseResult);
+    if (!caseRows || caseRows.length === 0) {
       return null;
     }
 
-    const caseMetadata = caseResult.rows[0];
+    const caseMetadata = caseRows[0];
 
     // Load form data
     const formResult = db.execute(
@@ -168,8 +175,9 @@ export const loadCase = async (caseId) => {
     );
 
     let formData = null;
-    if (formResult.rows && formResult.rows.length > 0) {
-      formData = JSON.parse(formResult.rows[0].form_json);
+    const formRows = getRowsArray(formResult);
+    if (formRows.length > 0) {
+      formData = JSON.parse(formRows[0].form_json);
     }
 
     // Load images
@@ -179,9 +187,10 @@ export const loadCase = async (caseId) => {
     );
 
     const images = [];
-    if (imageResult.rows && imageResult.rows.length > 0) {
-      for (let i = 0; i < imageResult.rows.length; i++) {
-        const img = imageResult.rows[i];
+    const imageRows = getRowsArray(imageResult);
+    if (imageRows.length > 0) {
+      for (let i = 0; i < imageRows.length; i++) {
+        const img = imageRows[i];
         images.push({
           id: img.id,
           uri: FileStorage.getImageUri(img.file_path),
@@ -235,8 +244,6 @@ export const updateCaseStatus = async (caseId, status) => {
  */
 export const syncCase = async (caseId) => {
   try {
-    const db = getDatabase();
-    
     // Load case data
     const caseData = await loadCase(caseId);
     if (!caseData) {
@@ -246,68 +253,46 @@ export const syncCase = async (caseId) => {
     // Update status to SYNCING
     await updateCaseStatus(caseId, 'SYNCING');
 
-    // Upload images first
-    const imageIds = [];
-    for (const image of caseData.images) {
-      if (!image.synced && image.filePath) {
-        try {
-          // Create FormData for image upload
-          const formData = new FormData();
-          formData.append('image', {
-            uri: image.uri,
-            type: 'image/jpeg',
-            name: `image_${image.id}.jpg`,
-          });
-          formData.append('case_id', caseId);
-          if (image.latitude && image.longitude) {
-            formData.append('latitude', image.latitude.toString());
-            formData.append('longitude', image.longitude.toString());
-            formData.append('accuracy', image.accuracy?.toString() || '');
-          }
-
-          // Upload image (adjust endpoint as needed)
-          const uploadResponse = await api.post('upload-image', formData, {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-            },
-          });
-
-          const serverImageId = uploadResponse.data.image_id;
-          imageIds.push(serverImageId);
-
-          // Update image as synced
-          db.execute(
-            `UPDATE case_images SET synced = 1, server_image_id = ? WHERE id = ?`,
-            [serverImageId, image.id]
-          );
-        } catch (error) {
-          console.error(`Error uploading image ${image.id}:`, error);
-          // Continue with other images
-        }
-      } else if (image.serverImageId) {
-        imageIds.push(image.serverImageId);
-      }
+    const formPayload = {
+      ...caseData.formData,
+    };
+    if (!formPayload.case_id) {
+      formPayload.case_id = caseData.metadata.case_id || caseId;
+    }
+    if (!formPayload.id && caseData.metadata?.id) {
+      formPayload.id = caseData.metadata.id;
     }
 
-    // Prepare form data with image IDs
-    const submitData = {
-      ...caseData.formData,
-      case_id: caseId,
-      reference_number: caseData.metadata.reference_number,
-      images: imageIds,
-    };
+    const submitResult = await submitCaseData(formPayload);
+    if (!submitResult.success) {
+      throw new Error(submitResult.error || 'Failed to submit case data');
+    }
 
-    // Submit case
-    const response = await api.post(API_ENDPOINTS.SUBMIT_CASE, submitData);
+    if (caseData.images && caseData.images.length > 0) {
+      const uploadPayload = caseData.images.map((image) => ({
+        uri: image.uri,
+        path: image.filePath,
+        type: 'image/jpeg',
+        name: `draft_${image.id}.jpg`,
+        latitude: image.latitude,
+        longitude: image.longitude,
+        accuracy: image.accuracy,
+        address: image.address,
+      }));
+      const uploadResult = await uploadCaseFiles(caseId, uploadPayload);
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || 'Failed to upload files');
+      }
+    }
 
     // Update status to SYNCED
     await updateCaseStatus(caseId, 'SYNCED');
 
-    // Optionally delete local data after successful sync
-    // await deleteCase(caseId);
+    // Clean up local draft after successful sync
+    await deleteCase(caseId);
 
     console.log('Case synced successfully:', caseId);
-    return response.data;
+    return submitResult.data;
   } catch (error) {
     console.error('Error syncing case:', error);
     
@@ -331,9 +316,13 @@ export const deleteCase = async (caseId) => {
       [caseId]
     );
 
-    if (imageResult.rows && imageResult.rows.length > 0) {
-      for (let i = 0; i < imageResult.rows.length; i++) {
-        const filePath = imageResult.rows[i].file_path;
+    const imageRows = getRowsArray(imageResult);
+    if (imageRows.length > 0) {
+      for (let i = 0; i < imageRows.length; i++) {
+        const filePath = imageRows[i]?.file_path;
+        if (!filePath) {
+          continue;
+        }
         await FileStorage.deleteImageFile(filePath);
       }
     }
@@ -364,14 +353,7 @@ export const getDraftCases = async () => {
       `SELECT * FROM cases WHERE status = 'DRAFTED' ORDER BY updated_at DESC`
     );
 
-    const cases = [];
-    if (result.rows && result.rows.length > 0) {
-      for (let i = 0; i < result.rows.length; i++) {
-        cases.push(result.rows[i]);
-      }
-    }
-
-    return cases;
+    return getRowsArray(result).filter(Boolean);
   } catch (error) {
     console.error('Error getting draft cases:', error);
     throw error;

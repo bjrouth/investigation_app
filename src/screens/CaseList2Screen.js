@@ -6,6 +6,7 @@ import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
 import { CasesStorage } from '../utils/storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { getDraftCases } from '../services/caseStorageService';
 
 const formatCaseData = (caseObj) => {
   // Format address from residence or business details
@@ -49,9 +50,32 @@ export default function CaseList2Screen({ route, navigation }) {
   const [casesToDisplay, setCasesToDisplay] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const getDraftCaseIds = async () => {
+    try {
+      const drafts = await getDraftCases();
+      return new Set(
+        drafts
+          .map((item) => String(item.id || item.case_id))
+          .filter((value) => value && value !== 'undefined' && value !== 'null'),
+      );
+    } catch (error) {
+      console.error('Failed to load draft cases:', error);
+      return new Set();
+    }
+  };
+
+  const filterOutDrafts = (caseList, draftIds) => {
+    if (!draftIds || draftIds.size === 0) return caseList;
+    return (caseList || []).filter((caseItemEntry) => {
+      const id = String(caseItemEntry?.id || caseItemEntry?.case_id || '');
+      return id && !draftIds.has(id);
+    });
+  };
+
   const loadCases = useCallback(async () => {
     try {
       setLoading(true);
+      const draftIds = await getDraftCaseIds();
       let cases = [];
 
       // If caseItem is passed and has cases array, use it directly
@@ -78,7 +102,8 @@ export default function CaseList2Screen({ route, navigation }) {
       }
 
       // Format cases for display
-      const formattedCases = cases.map(formatCaseData);
+      const filteredCases = filterOutDrafts(cases, draftIds);
+      const formattedCases = filteredCases.map(formatCaseData);
       setCasesToDisplay(formattedCases);
     } catch (error) {
       console.error('Error loading cases:', error);

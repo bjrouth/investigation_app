@@ -364,6 +364,7 @@ export default function HomeScreen() {
           await loadDashboard();
           setIsRefreshing(false);
         }}
+        color="white"
       />
     </AppLayout>
   );
@@ -556,5 +557,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: AppTheme.spacing.md,
     bottom: AppTheme.spacing.md,
+    backgroundColor: AppTheme.colors.primary,
   },
 });

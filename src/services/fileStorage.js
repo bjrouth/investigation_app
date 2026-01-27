@@ -67,13 +67,17 @@ export const saveImageFile = async (sourceUri, caseId, imageId) => {
     // Ensure case directory exists
     await ensureCaseDirectory(caseId);
     
+    const normalizedSource = sourceUri?.startsWith('file://')
+      ? sourceUri.replace('file://', '')
+      : sourceUri;
+
     // Generate filename
-    const extension = sourceUri.split('.').pop() || 'jpg';
+    const extension = normalizedSource?.split('.').pop() || 'jpg';
     const filename = `img_${imageId}.${extension}`;
     const destPath = `${getCaseDirectory(caseId)}/${filename}`;
     
     // Copy file from source to destination
-    await RNFS.copyFile(sourceUri, destPath);
+    await RNFS.copyFile(normalizedSource, destPath);
     
     console.log(`Image saved: ${destPath}`);
     return destPath;

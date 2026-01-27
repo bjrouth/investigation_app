@@ -94,12 +94,17 @@ export default function SettingScreen({ navigation }) {
     console.log('Lost Case button pressed');
   };
 
-  const handleLogout = () => {
-    // Navigate to Login screen in parent Stack Navigator
-    navigation.getParent()?.reset({
-      index: 0,
-      routes: [{ name: 'Login' }],
-    });
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      navigation.getParent()?.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    }
   };
 
   return (
