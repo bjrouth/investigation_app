@@ -1,41 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, View, TouchableOpacity, Animated } from 'react-native';
-import { Card, Text, ProgressBar, Menu } from 'react-native-paper';
+import { Card, Text, ProgressBar, Menu, FAB } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
 import authService from '../services/authService';
+import api from '../services/api';
 
-// Sample stats data
-const statsData = {
-  totalCases: 54,
-  pendingCases: 12,
-  completedCases: 38,
-  unsubmittedCases: 4,
-  completionRate: 70,
+const defaultStatsData = {
+  totalCases: 0,
+  pendingCases: 0,
+  completedCases: 0,
+  unsubmittedCases: 0,
+  completionRate: 0,
 };
-
-// Weekly data for chart
-const weeklyData = [
-  { label: 'Mon', value: 8 },
-  { label: 'Tue', value: 12 },
-  { label: 'Wed', value: 6 },
-  { label: 'Thu', value: 15 },
-  { label: 'Fri', value: 10 },
-  { label: 'Sat', value: 5 },
-  { label: 'Sun', value: 3 },
-];
-
-// Monthly data for chart
-const monthlyData = [
-  { label: 'Jan', value: 45 },
-  { label: 'Feb', value: 52 },
-  { label: 'Mar', value: 38 },
-  { label: 'Apr', value: 61 },
-  { label: 'May', value: 55 },
-  { label: 'Jun', value: 48 },
-];
 
 const StatCard = ({ icon, title, value, color, subtitle, index = 0 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -182,6 +161,14 @@ export default function HomeScreen() {
   const [viewType, setViewType] = useState('week');
   const [menuVisible, setMenuVisible] = useState(false);
   const [userName, setUserName] = useState('');
+  const [statsData, setStatsData] = useState(defaultStatsData);
+  const [weeklyData, setWeeklyData] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [quickSummary, setQuickSummary] = useState({
+    weeklyChangePercent: null,
+    avgCasesPerDay: null,
+  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -201,9 +188,42 @@ export default function HomeScreen() {
     loadUser();
   }, []);
 
+  const loadDashboard = async () => {
+    try {
+      const response = await api.get('dashboard/home');
+      const payload = response?.data || {};
+      const summary = payload.summary || payload;
+      setStatsData({
+        totalCases: Number(summary.totalCases ?? 0),
+        pendingCases: Number(summary.pendingCases ?? 0),
+        completedCases: Number(summary.completedCases ?? 0),
+        unsubmittedCases: Number(summary.unsubmittedCases ?? 0),
+        completionRate: Number(summary.completionRate ?? 0),
+      });
+      setWeeklyData(Array.isArray(payload.weekly) ? payload.weekly : []);
+      setMonthlyData(Array.isArray(payload.monthly) ? payload.monthly : []);
+      setQuickSummary({
+        weeklyChangePercent: payload?.quickSummary?.weeklyChangePercent ?? null,
+        avgCasesPerDay: payload?.quickSummary?.avgCasesPerDay ?? null,
+      });
+    } catch (e) {
+      console.error('Failed to load dashboard data:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
   const chartData = viewType === 'week' ? weeklyData : monthlyData;
-  const maxValue = Math.max(...chartData.map(d => d.value));
+  const maxValue = Math.max(1, ...chartData.map(d => Number(d.value || 0)));
   const chartTitle = viewType === 'week' ? 'Cases This Week' : 'Cases This Month';
+  const weeklyChangeLabel =
+    quickSummary.weeklyChangePercent === null
+      ? 'N/A this week'
+      : `${quickSummary.weeklyChangePercent >= 0 ? '+' : ''}${quickSummary.weeklyChangePercent}% this week`;
+  const avgCasesLabel =
+    quickSummary.avgCasesPerDay === null ? 'Avg: N/A cases/day' : `Avg: ${quickSummary.avgCasesPerDay} cases/day`;
 
   return (
     <AppLayout>
@@ -325,16 +345,26 @@ export default function HomeScreen() {
             <View style={styles.summaryRow}>
               <View style={styles.summaryItem}>
                 <Icon name="trending-up" size={20} color={AppTheme.colors.primary} />
-                <Text style={styles.summaryText}>+12% this week</Text>
+                <Text style={styles.summaryText}>{weeklyChangeLabel}</Text>
               </View>
               <View style={styles.summaryItem}>
                 <Icon name="calendar-clock" size={20} color={AppTheme.colors.primary} />
-                <Text style={styles.summaryText}>Avg: 8 cases/day</Text>
+                <Text style={styles.summaryText}>{avgCasesLabel}</Text>
               </View>
             </View>
           </Card.Content>
         </Card>
       </ScrollView>
+      <FAB
+        icon="refresh"
+        style={styles.refreshFab}
+        onPress={async () => {
+          if (isRefreshing) return;
+          setIsRefreshing(true);
+          await loadDashboard();
+          setIsRefreshing(false);
+        }}
+      />
     </AppLayout>
   );
 }
@@ -521,5 +551,10 @@ const styles = StyleSheet.create({
   summaryText: {
     fontSize: AppTheme.typography.body.fontSize,
     color: AppTheme.colors.onSurface,
+  },
+  refreshFab: {
+    position: 'absolute',
+    right: AppTheme.spacing.md,
+    bottom: AppTheme.spacing.md,
   },
 });

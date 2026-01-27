@@ -7,7 +7,12 @@ export default function CasePreviewModal({ visible, onClose, caseItem }) {
   const raw = caseItem?.raw || {};
   const [imagePreview, setImagePreview] = useState(null);
   const images =
-    [raw?.files, raw?.images, raw?.case_images].find(Array.isArray) || [];
+    [
+      raw?.files_by_type?.response,
+      raw?.files,
+      raw?.images,
+      raw?.case_images,
+    ].find(Array.isArray) || [];
 
   const normalizeObject = (value) => {
     if (!value) return {};
@@ -27,16 +32,19 @@ export default function CasePreviewModal({ visible, onClose, caseItem }) {
     return (
       <View style={styles.previewSection}>
         <Text style={styles.previewSectionTitle}>{title}</Text>
-        {fields.map(({ key, label }) => {
-          const value = source[key];
-          const display =
-            value === null || value === undefined || value === '' ? 'N/A' : String(value);
-          return (
-            <Text key={key} style={styles.previewRow}>
-              {label}: {display}
-            </Text>
-          );
-        })}
+        <View style={styles.previewCardSection}>
+          {fields.map(({ key, label }) => {
+            const value = source[key];
+            const display =
+              value === null || value === undefined || value === '' ? 'N/A' : String(value);
+            return (
+              <View key={key} style={styles.previewRow}>
+                <Text style={styles.previewLabel}>{label}:</Text>
+                <Text style={styles.previewValue}>{display}</Text>
+              </View>
+            );
+          })}
+        </View>
       </View>
     );
   };
@@ -166,7 +174,10 @@ export default function CasePreviewModal({ visible, onClose, caseItem }) {
   const flType = String(raw?.fl_type || '').toLowerCase();
   const isRv = raw?.is_rv === 1 || flType.includes('rv');
   const isBv = raw?.is_bv === 1 || (!isRv && flType.includes('bv'));
-  const businessType = String(raw?.type_of_business || '').toLowerCase();
+  const businessType = String(raw?.type_of_business || raw?.case_study?.type_of_business || '').toLowerCase();
+  const residentialNeighbour = Array.isArray(raw?.residential_neighbour) ? raw.residential_neighbour[0] : raw?.residential_neighbour;
+  const businessNeighbour = Array.isArray(raw?.business_neighbour) ? raw.business_neighbour[0] : raw?.business_neighbour;
+  const officeNeighbour = Array.isArray(raw?.office_neighbour) ? raw.office_neighbour[0] : raw?.office_neighbour;
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -180,23 +191,36 @@ export default function CasePreviewModal({ visible, onClose, caseItem }) {
           <ScrollView style={styles.previewContent} contentContainerStyle={styles.previewContentContainer}>
             <View style={styles.previewSection}>
               <Text style={styles.previewSectionTitle}>Summary</Text>
-              {caseItem?.applicantName ? (
-                <Text style={styles.previewRow}>Applicant: {caseItem.applicantName}</Text>
-              ) : null}
-              <Text style={styles.previewRow}>Status: {caseItem?.status || 'Completed'}</Text>
-              <Text style={styles.previewRow}>
-                FL Type: {caseItem?.subtitle?.split(':')[1]?.trim() || 'N/A'}
-              </Text>
-              <Text style={styles.previewRow}>Address: {caseItem?.address || 'N/A'}</Text>
+              <View style={styles.previewCardSection}>
+                {caseItem?.applicantName ? (
+                  <View style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>Applicant:</Text>
+                    <Text style={styles.previewValue}>{caseItem.applicantName}</Text>
+                  </View>
+                ) : null}
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewLabel}>Status:</Text>
+                  <Text style={styles.previewValue}>{caseItem?.status || 'Completed'}</Text>
+                </View>
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewLabel}>FL Type:</Text>
+                  <Text style={styles.previewValue}>{caseItem?.subtitle?.split(':')[1]?.trim() || 'N/A'}</Text>
+                </View>
+                <View style={styles.previewRow}>
+                  <Text style={styles.previewLabel}>Address:</Text>
+                  <Text style={styles.previewValue}>{caseItem?.address || 'N/A'}</Text>
+                </View>
+              </View>
             </View>
 
             <View style={styles.previewSection}>
               <Text style={styles.previewSectionTitle}>Case Details</Text>
               <View style={styles.previewCardSection}>
                 {caseDetailsFields.map(({ key, label }) => (
-                  <Text key={key} style={styles.previewRow}>
-                    {label}: {getRawValue(key)}
-                  </Text>
+                  <View key={key} style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>{label}:</Text>
+                    <Text style={styles.previewValue}>{getRawValue(key)}</Text>
+                  </View>
                 ))}
               </View>
             </View>
@@ -205,9 +229,10 @@ export default function CasePreviewModal({ visible, onClose, caseItem }) {
               <Text style={styles.previewSectionTitle}>Residence Address</Text>
               <View style={styles.previewCardSection}>
                 {residenceAddressFields.map(({ key, label }) => (
-                  <Text key={key} style={styles.previewRow}>
-                    {label}: {getRawValue(key)}
-                  </Text>
+                  <View key={key} style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>{label}:</Text>
+                    <Text style={styles.previewValue}>{getRawValue(key)}</Text>
+                  </View>
                 ))}
               </View>
             </View>
@@ -216,24 +241,25 @@ export default function CasePreviewModal({ visible, onClose, caseItem }) {
               <Text style={styles.previewSectionTitle}>Business Address</Text>
               <View style={styles.previewCardSection}>
                 {businessAddressFields.map(({ key, label }) => (
-                  <Text key={key} style={styles.previewRow}>
-                    {label}: {getRawValue(key)}
-                  </Text>
+                  <View key={key} style={styles.previewRow}>
+                    <Text style={styles.previewLabel}>{label}:</Text>
+                    <Text style={styles.previewValue}>{getRawValue(key)}</Text>
+                  </View>
                 ))}
               </View>
             </View>
 
             {isRv && renderFields('Residential Details', residentialFields, raw?.residential_details || raw)}
-            {isRv && renderFields('Neighbour Verification', rvNeighbourFields, raw?.residential_details || raw)}
+            {isRv && renderFields('Neighbour Verification', rvNeighbourFields, residentialNeighbour || raw?.residential_details || raw)}
 
             {isBv && renderFields('Business Verification', bvBaseFields, raw)}
             {isBv && businessType === 'self_employed' &&
               renderFields('Self Employed', selfEmployedFields, raw?.self_employed)}
             {isBv && businessType === 'service' &&
-              renderFields('Service', serviceFields, raw?.service)}
-            {isBv && renderFields('Neighbour Verification', bvNeighbourFields, raw)}
+              renderFields('Service', serviceFields, raw?.service_details || raw?.service)}
+            {isBv && renderFields('Neighbour Verification', bvNeighbourFields, businessNeighbour || officeNeighbour || raw)}
 
-            {renderFields('Case Status', caseStatusFields, raw)}
+            {renderFields('Case Status', caseStatusFields, raw?.case_study || raw)}
 
             {images.length > 0 ? (
               <View style={styles.previewSection}>
@@ -250,7 +276,7 @@ export default function CasePreviewModal({ visible, onClose, caseItem }) {
                       >
                         <Image source={{ uri }} style={styles.previewImage} />
                       </TouchableOpacity>
-                    );
+                    ); 
                   })}
                 </View>
               </View>
@@ -321,9 +347,21 @@ const styles = StyleSheet.create({
     marginBottom: AppTheme.spacing.xs,
   },
   previewRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: AppTheme.spacing.xs,
+    marginBottom: 6,
+  },
+  previewLabel: {
     fontSize: AppTheme.typography.body.fontSize,
     color: AppTheme.colors.onSurface,
-    marginBottom: 4,
+    fontWeight: '700',
+  },
+  previewValue: {
+    flex: 1,
+    fontSize: AppTheme.typography.body.fontSize,
+    color: AppTheme.colors.onSurfaceVariant,
+    lineHeight: AppTheme.typography.body.lineHeight,
   },
   previewImages: {
     flexDirection: 'row',

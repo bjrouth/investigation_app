@@ -89,3 +89,4 @@ If you're having issues getting the above steps to work, see the [Troubleshootin
 # Learn More
 
 start tcp adb reverse tcp:8000 tcp:8000
+ adb reverse tcp:8000 tcp:8000

@@ -9,13 +9,13 @@ export default function UnsubmittedCasesScreen() {
   return (
     <AppLayout>
       <AppHeader 
-        title="Unsubmitted Cases"
+        title="Unsubmitted Cases" 
       />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyTitle}>No data available</Text>
           <Text style={styles.emptySubtitle}>Unsubmitted cases will appear here once synced.</Text>
-        </View>
+              </View>
       </ScrollView>
     </AppLayout>
   );

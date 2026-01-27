@@ -39,6 +39,7 @@ export default function HistoryScreen() {
     const submittedDate =
       caseObj.submitted_date ||
       caseObj.completed_at ||
+      caseObj.enquery_time ||
       caseObj.updated_at ||
       caseObj.created_at;
     const dateTime = submittedDate
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
     marginBottom: AppTheme.spacing.xs,
   },
   title: {
-    fontSize: AppTheme.typography.h4.fontSize,
+    fontSize: AppTheme.typography.h4.fontSize, 
     fontWeight: '700',
     color: AppTheme.colors.primary,
     flex: 1,
