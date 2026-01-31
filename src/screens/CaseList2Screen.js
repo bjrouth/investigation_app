@@ -19,7 +19,7 @@ const formatCaseData = (caseObj) => {
   const address = businessAddress || residenceAddress || 'Address not available';
 
   // Format date
-  const date = caseObj.created_at 
+  const date = caseObj.created_at
     ? new Date(caseObj.created_at).toLocaleString('en-US', {
         weekday: 'long',
         year: 'numeric',
@@ -33,13 +33,25 @@ const formatCaseData = (caseObj) => {
   // Get product name
   const productName = caseObj.product?.name || caseObj.custom_name || caseObj.bank_product_name || 'N/A';
   const bankName = caseObj.bank?.name || 'Unknown Bank';
+  const flType = caseObj.fl_type?.toLowerCase() || '';
+  const isBusinessCase = flType.includes('bv') || flType.includes('pfi');
+  const phone = isBusinessCase ? caseObj.business_phone_number : caseObj.residence_phone_number;
+  const showPhone = caseObj.show_phone_number !== false;
+  const applicantName =
+    caseObj.applicant_name ||
+    caseObj.applicant?.name ||
+    caseObj.customer_name ||
+    caseObj.name ||
+    '';
 
   return {
     id: caseObj.id || caseObj.case_id || String(Math.random()),
     fullTitle: `${bankName} ${productName}`,
     subtitle: `Fl Type : ${caseObj.fl_type?.toUpperCase() || 'N/A'}`,
+    applicantName,
     status: caseObj.status || 'Pending',
     address: address,
+    phone: showPhone ? phone : null,
     dateTime: date,
     caseData: caseObj, // Store full case data for navigation
   };
@@ -153,19 +165,32 @@ export default function CaseList2Screen({ route, navigation }) {
                         <Text style={styles.statusText}>{caseData.status}</Text>
                       </View>
                     </View>
-                    
-                    <Text style={styles.subtitle}>FL Type: {caseData.subtitle?.split(':')[1]?.trim() || 'N/A'}</Text>
-                    
-                    <View style={styles.addressContainer}>
-                      <Text style={styles.addressLabel}>Address:</Text>
-                      <Text style={styles.addressText}>{caseData.address}</Text>
-                    </View>
-                    
-                    <View style={styles.dateContainer}>
+
+                    {caseData.applicantName ? (
+                      <Text style={styles.applicantText} numberOfLines={1}>
+                        Applicant: {caseData.applicantName}
+                      </Text>
+                    ) : null}
+
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaText}>
+                        FL Type: {caseData.subtitle?.split(':')[1]?.trim() || 'N/A'}
+                      </Text>
                       <Chip style={styles.dateChip} textStyle={styles.dateText}>
                         {caseData.dateTime}
                       </Chip>
                     </View>
+
+                    <Text style={styles.addressText} numberOfLines={2}>
+                      {caseData.address}
+                    </Text>
+
+                    {caseData.phone ? (
+                      <Text style={styles.phoneText} numberOfLines={1}>
+                        Phone: {caseData.phone}
+                      </Text>
+                    ) : null}
+                    
                   </Card.Content>
                 </Card>
               </TouchableOpacity>
@@ -225,29 +250,20 @@ const styles = StyleSheet.create({
     color: AppTheme.colors.primary,
     fontWeight: '500',
   },
-  subtitle: {
+  applicantText: {
     fontSize: AppTheme.typography.body.fontSize,
-    color: AppTheme.colors.onSurface,
-    marginBottom: AppTheme.spacing.md,
-    marginTop: 0,
-  },
-  addressContainer: {
-    marginBottom: AppTheme.spacing.md,
-  },
-  addressLabel: {
-    fontSize: AppTheme.typography.body.fontSize,
-    fontWeight: '600',
     color: AppTheme.colors.onSurface,
     marginBottom: AppTheme.spacing.xs,
   },
-  addressText: {
-    fontSize: AppTheme.typography.body.fontSize,
-    color: AppTheme.colors.onSurfaceVariant,
-    lineHeight: AppTheme.typography.body.lineHeight,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: AppTheme.spacing.xs,
   },
-  dateContainer: {
-    marginTop: AppTheme.spacing.md,
-    alignItems: 'flex-start',
+  metaText: {
+    fontSize: AppTheme.typography.body.fontSize,
+    color: AppTheme.colors.onSurface,
   },
   dateChip: {
     backgroundColor: AppTheme.colors.primary,
@@ -256,6 +272,16 @@ const styles = StyleSheet.create({
   dateText: {
     color: AppTheme.colors.surface,
     fontSize: AppTheme.typography.caption.fontSize,
+  },
+  addressText: {
+    fontSize: AppTheme.typography.body.fontSize,
+    color: AppTheme.colors.onSurfaceVariant,
+    lineHeight: AppTheme.typography.body.lineHeight,
+    marginBottom: AppTheme.spacing.xs,
+  },
+  phoneText: {
+    fontSize: AppTheme.typography.body.fontSize,
+    color: AppTheme.colors.onSurfaceVariant,
   },
   loader: {
     flex: 1,

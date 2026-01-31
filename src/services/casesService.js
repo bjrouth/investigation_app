@@ -160,7 +160,12 @@ export const submitCaseData = async (caseData) => {
         continue;
       }
 
-      if (key === 'self_employed' || key === 'service' || key === 'residential_details') {
+      if (
+        key === 'self_employed' ||
+        key === 'service' ||
+        key === 'residential_details' ||
+        key === 'pfi_details'
+      ) {
         // Stringify nested objects (matching Ionic format)
         formData.append(key, JSON.stringify(caseData[key]));
       } else {

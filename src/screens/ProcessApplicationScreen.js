@@ -5,9 +5,9 @@ import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
 import { confirmDeleteImage, takePhotoWithGeoAndCompression, pickImageFromGallery } from '../utils/locationHelpers';
-import { generateTestData } from '../utils/testDataGenerator';
 import { submitCaseData, uploadCaseFiles } from '../services/casesService';
 import NetInfo from '@react-native-community/netinfo';
+import { generateTestData } from '../utils/testDataGenerator';
 import {
   saveCaseMetadata,
   saveCaseForm,
@@ -33,9 +33,15 @@ export default function ProcessApplicationScreen({ route, navigation }) {
   const flTypeFromData = caseData?.fl_type?.toLowerCase() || 
     caseData?.subtitle?.split(':')[1]?.trim()?.toLowerCase() || 
     'bv';
-  const caseType = flTypeFromData.includes('rv') ? 'rv' : 'bv';
+  const caseType = flTypeFromData.includes('pfi')
+    ? 'pfi'
+    : flTypeFromData.includes('rv')
+      ? 'rv'
+      : 'bv';
   const isBv = caseType === 'bv';
   const isRv = caseType === 'rv';
+  const isPfi = caseType === 'pfi';
+  const isBusinessCase = isBv || isPfi;
 
   // Step management
   const [step, setStep] = useState('details');
@@ -61,86 +67,106 @@ export default function ProcessApplicationScreen({ route, navigation }) {
   
   // Generate default test data based on case type
   const getDefaultFormData = () => {
-    const defaultData = generateTestData(caseType, null);
+    // const defaultData = null;
+    const defaultData =  generateTestData(caseType);
     
     // Merge with empty structure to ensure all fields exist
     return {
       // RV Personal Details
       residential_details: {
-        name_of_person_met: defaultData.residential_details?.name_of_person_met || '',
-        met_person_relation: defaultData.residential_details?.met_person_relation || '',
-        other_relation: defaultData.residential_details?.other_relation || '',
-        id_proof_seen: defaultData.residential_details?.id_proof_seen || '',
-        member_count: defaultData.residential_details?.member_count || '',
-        earning_member_count: defaultData.residential_details?.earning_member_count || '',
-        dependent_member_count: defaultData.residential_details?.dependent_member_count || '',
-        total_stability: defaultData.residential_details?.total_stability || '',
-        stability_less_6_month_last_address_confirm: defaultData.residential_details?.stability_less_6_month_last_address_confirm || '',
-        residence_ownership: defaultData.residential_details?.residence_ownership || '',
-        residence_ownership_other: defaultData.residential_details?.residence_ownership_other || '',
-        agri_land_with_location: defaultData.residential_details?.agri_land_with_location || '',
-        applicant_working_company_name_location: defaultData.residential_details?.applicant_working_company_name_location || '',
-        vehicle_details: defaultData.residential_details?.vehicle_details || '',
-        house_class_locality: defaultData.residential_details?.house_class_locality || '',
-        house_interior: defaultData.residential_details?.house_interior || '',
-        house_interior_other: defaultData.residential_details?.house_interior_other || '',
-        living_standard: defaultData.residential_details?.living_standard || '',
-        living_standard_other: defaultData.residential_details?.living_standard_other || '',
-        exterior_of_house: defaultData.residential_details?.exterior_of_house || '',
-        remark: defaultData.residential_details?.remark || '',
-        neighbour_1_details: defaultData.residential_details?.neighbour_1_details || '',
-        neighbour_1_remark: defaultData.residential_details?.neighbour_1_remark || '',
-        neighbour_2_details: defaultData.residential_details?.neighbour_2_details || '',
-        neighbour_2_remark: defaultData.residential_details?.neighbour_2_remark || '',
+        name_of_person_met: defaultData?.residential_details?.name_of_person_met || '',
+        met_person_relation: defaultData?.residential_details?.met_person_relation || '',
+        other_relation: defaultData?.residential_details?.other_relation || '',
+        id_proof_seen: defaultData?.residential_details?.id_proof_seen || '',
+        member_count: defaultData?.residential_details?.member_count || '',
+        earning_member_count: defaultData?.residential_details?.earning_member_count || '',
+        dependent_member_count: defaultData?.residential_details?.dependent_member_count || '',
+        total_stability: defaultData?.residential_details?.total_stability || '',
+        stability_less_6_month_last_address_confirm: defaultData?.residential_details?.stability_less_6_month_last_address_confirm || '',
+        residence_ownership: defaultData?.residential_details?.residence_ownership || '',
+        residence_ownership_other: defaultData?.residential_details?.residence_ownership_other || '',
+        agri_land_with_location: defaultData?.residential_details?.agri_land_with_location || '',
+        applicant_working_company_name_location: defaultData?.residential_details?.applicant_working_company_name_location || '',
+        vehicle_details: defaultData?.residential_details?.vehicle_details || '',
+        house_class_locality: defaultData?.residential_details?.house_class_locality || '',
+        house_interior: defaultData?.residential_details?.house_interior || '',
+        house_interior_other: defaultData?.residential_details?.house_interior_other || '',
+        living_standard: defaultData?.residential_details?.living_standard || '',
+        living_standard_other: defaultData?.residential_details?.living_standard_other || '',
+        exterior_of_house: defaultData?.residential_details?.exterior_of_house || '',
+        remark: defaultData?.residential_details?.remark || '',
+        neighbour_1_details: defaultData?.residential_details?.neighbour_1_details || '',
+        neighbour_1_remark: defaultData?.residential_details?.neighbour_1_remark || '',
+        neighbour_2_details: defaultData?.residential_details?.neighbour_2_details || '',
+        neighbour_2_remark: defaultData?.residential_details?.neighbour_2_remark || '',
       },
       // BV Basic
-      met_person_name: defaultData.met_person_name || '',
-      relation: defaultData.relation || '',
-      type_of_business: defaultData.type_of_business || '',
+      met_person_name: defaultData?.met_person_name || '',
+      relation: defaultData?.relation || '',
+      type_of_business: defaultData?.type_of_business || '',
       // Self Employed
       self_employed: {
-        id_proof_seen: defaultData.self_employed?.id_proof_seen || '',
-        applicant_is: defaultData.self_employed?.applicant_is || '',
-        applicant_is_other: defaultData.self_employed?.applicant_is_other || '',
-        nature_of_business: defaultData.self_employed?.nature_of_business || '',
-        nature_of_business_other: defaultData.self_employed?.nature_of_business_other || '',
-        office_ownership: defaultData.self_employed?.office_ownership || '',
-        stability: defaultData.self_employed?.stability || '',
-        stability_other: defaultData.self_employed?.stability_other || '',
-        stocks: defaultData.self_employed?.stocks || '',
-        gst_bill_visiting_card_seen: defaultData.self_employed?.gst_bill_visiting_card_seen || '',
-        business_activity_level_seen: defaultData.self_employed?.business_activity_level_seen || '',
-        employee_seen: defaultData.self_employed?.employee_seen || '',
-        applicant_current_account_with_bank: defaultData.self_employed?.applicant_current_account_with_bank || '',
-        applicant_has_vehicle: defaultData.self_employed?.applicant_has_vehicle || '',
-        exterior_off_floor: defaultData.self_employed?.exterior_off_floor || '',
-        remark: defaultData.self_employed?.remark || '',
+        id_proof_seen: defaultData?.self_employed?.id_proof_seen || '',
+        applicant_is: defaultData?.self_employed?.applicant_is || '',
+        applicant_is_other: defaultData?.self_employed?.applicant_is_other || '',
+        nature_of_business: defaultData?.self_employed?.nature_of_business || '',
+        nature_of_business_other: defaultData?.self_employed?.nature_of_business_other || '',
+        office_ownership: defaultData?.self_employed?.office_ownership || '',
+        stability: defaultData?.self_employed?.stability || '',
+        stability_other: defaultData?.self_employed?.stability_other || '',
+        stocks: defaultData?.self_employed?.stocks || '',
+        gst_bill_visiting_card_seen: defaultData?.self_employed?.gst_bill_visiting_card_seen || '',
+        business_activity_level_seen: defaultData?.self_employed?.business_activity_level_seen || '',
+        employee_seen: defaultData?.self_employed?.employee_seen || '',
+        applicant_current_account_with_bank: defaultData?.self_employed?.applicant_current_account_with_bank || '',
+        applicant_has_vehicle: defaultData?.self_employed?.applicant_has_vehicle || '',
+        exterior_off_floor: defaultData?.self_employed?.exterior_off_floor || '',
+        remark: defaultData?.self_employed?.remark || '',
       },
       // Service
       service: {
-        working_since: defaultData.service?.working_since || '',
-        designation: defaultData.service?.designation || '',
-        department_room_number: defaultData.service?.department_room_number || '',
-        employee_code: defaultData.service?.employee_code || '',
-        company_nature_of_business: defaultData.service?.company_nature_of_business || '',
-        drawing_salary_per_month: defaultData.service?.drawing_salary_per_month || '',
-        id_proof_seen: defaultData.service?.id_proof_seen || '',
-        employee_seen: defaultData.service?.employee_seen || '',
-        exterior_off_floor: defaultData.service?.exterior_off_floor || '',
-        remark: defaultData.service?.remark || '',
+        working_since: defaultData?.service?.working_since || '',
+        designation: defaultData?.service?.designation || '',
+        department_room_number: defaultData?.service?.department_room_number || '',
+        employee_code: defaultData?.service?.employee_code || '',
+        company_nature_of_business: defaultData?.service?.company_nature_of_business || '',
+        drawing_salary_per_month: defaultData?.service?.drawing_salary_per_month || '',
+        id_proof_seen: defaultData?.service?.id_proof_seen || '',
+        employee_seen: defaultData?.service?.employee_seen || '',
+        exterior_off_floor: defaultData?.service?.exterior_off_floor || '',
+        remark: defaultData?.service?.remark || '',
       },
       // BV Neighbours
-      neighbour_1_details: defaultData.neighbour_1_details || '',
-      neighbour_1_remark: defaultData.neighbour_1_remark || '',
-      neighbour_2_details: defaultData.neighbour_2_details || '',
-      neighbour_2_remark: defaultData.neighbour_2_remark || '',
-      signboard_seen_with_name: defaultData.signboard_seen_with_name || '',
+      neighbour_1_details: defaultData?.neighbour_1_details || '',
+      neighbour_1_remark: defaultData?.neighbour_1_remark || '',
+      neighbour_2_details: defaultData?.neighbour_2_details || '',
+      neighbour_2_remark: defaultData?.neighbour_2_remark || '',
+      signboard_seen_with_name: defaultData?.signboard_seen_with_name || '',
       // Case Status
-      case_status: defaultData.case_status || '',
-      rejection_reason: defaultData.rejection_reason || '',
-      rejection_reason_other: defaultData.rejection_reason_other || '',
+      case_status: defaultData?.case_status || '',
+      rejection_reason: defaultData?.rejection_reason || '',
+      rejection_reason_other: defaultData?.rejection_reason_other || '',
       // Additional
-      additional_remark: defaultData.additional_remark || '',
+      additional_remark: defaultData?.additional_remark || '',
+      // PFI Details
+      pfi_details: {
+        qualification: defaultData?.pfi_details?.qualification || '',
+        bank_account_details: defaultData?.pfi_details?.bank_account_details || '',
+        last_turnover: defaultData?.pfi_details?.last_turnover || '',
+        monthly_income: defaultData?.pfi_details?.monthly_income || '',
+        any_previous_loan: defaultData?.pfi_details?.any_previous_loan || '',
+        market_value_of_premises: defaultData?.pfi_details?.market_value_of_premises || '',
+        ca_name: defaultData?.pfi_details?.ca_name || '',
+        ca_contact_number: defaultData?.pfi_details?.ca_contact_number || '',
+        relative_reference_contact_1: defaultData?.pfi_details?.relative_reference_contact_1 || '',
+        relative_reference_contact_2: defaultData?.pfi_details?.relative_reference_contact_2 || '',
+        stock_value: defaultData?.pfi_details?.stock_value || '',
+        purchase_parties_name: defaultData?.pfi_details?.purchase_parties_name || '',
+        supply_parties_name: defaultData?.pfi_details?.supply_parties_name || '',
+        other_business_income_source: defaultData?.pfi_details?.other_business_income_source || '',
+        family_members: defaultData?.pfi_details?.family_members || '',
+        earning_members: defaultData?.pfi_details?.earning_members || '',
+      },
       // Location Pictures
       locationPictures: [],
       photo_source: '', // 'camera', 'gallery', or 'no_photo'
@@ -164,9 +190,11 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     });
   };
 
-  const steps = isRv 
+  const steps = isRv
     ? ['details', 'rv_personal_details', 'rv_neighbours', 'case_status', 'take_pictures', 'preview', 'remark_submit']
-    : ['details', 'bv_basic', 'work_details', 'bv_neighbours', 'case_status', 'take_pictures', 'preview', 'remark_submit'];
+    : isPfi
+      ? ['details', 'pfi_details', 'case_status', 'take_pictures', 'preview', 'remark_submit']
+      : ['details', 'bv_basic', 'work_details', 'bv_neighbours', 'case_status', 'take_pictures', 'preview', 'remark_submit'];
 
   const currentStepIndex = steps.indexOf(step);
 
@@ -259,11 +287,11 @@ export default function ProcessApplicationScreen({ route, navigation }) {
           <View style={styles.compactRow}>
             <View style={[styles.compactField, styles.fullWidthField]}>
               <View style={styles.compactFieldHeader}>
-                <IconButton icon={isBv ? "office-building" : "home"} size={14} iconColor={AppTheme.colors.primary} style={styles.compactFieldIcon} />
-                <Text style={styles.compactFieldLabel}>{isBv ? 'Office Address' : 'Permanent Address'}</Text>
+                <IconButton icon={isBusinessCase ? "office-building" : "home"} size={14} iconColor={AppTheme.colors.primary} style={styles.compactFieldIcon} />
+                <Text style={styles.compactFieldLabel}>{isBusinessCase ? 'Office Address' : 'Permanent Address'}</Text>
               </View>
               <Text style={styles.compactFieldValue} numberOfLines={2}>
-                {isBv 
+                {isBusinessCase
                   ? ([
                       caseData?.business_house_number,
                       caseData?.business_landmark,
@@ -279,6 +307,11 @@ export default function ProcessApplicationScreen({ route, navigation }) {
                       caseData?.residence_phone_number
                     ].filter(Boolean).join(', ') || 'N/A')}
               </Text>
+              {isBusinessCase && caseData?.show_phone_number === 1 && caseData?.business_phone_number ? (
+                <Text style={styles.compactFieldValue}>
+                  Phone: {caseData.business_phone_number}
+                </Text>
+              ) : null}
             </View>
           </View>
 
@@ -1101,6 +1134,149 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     </View>
   );
 
+  const renderPFIDetails = () => (
+    <View>
+      <Card style={styles.formSectionCard}>
+        <Card.Content>
+          <View style={styles.sectionHeader}>
+            <IconButton icon="file-document" size={20} iconColor={AppTheme.colors.primary} style={styles.sectionIcon} />
+            <Text style={styles.sectionTitle}>PFI Details</Text>
+          </View>
+          <TextInput
+            label="Qualification"
+            value={formData.pfi_details.qualification}
+            onChangeText={(val) => updateFormData('pfi_details.qualification', val)}
+            mode="outlined"
+            style={styles.formInput}
+          />
+          <TextInput
+            label="Bank account details"
+            value={formData.pfi_details.bank_account_details}
+            onChangeText={(val) => updateFormData('pfi_details.bank_account_details', val)}
+            mode="outlined"
+            style={styles.formInput}
+            multiline
+          />
+          <TextInput
+            label="Last turnover"
+            value={formData.pfi_details.last_turnover}
+            onChangeText={(val) => updateFormData('pfi_details.last_turnover', val)}
+            mode="outlined"
+            style={styles.formInput}
+          />
+          <TextInput
+            label="Monthly income"
+            value={formData.pfi_details.monthly_income}
+            onChangeText={(val) => updateFormData('pfi_details.monthly_income', val)}
+            mode="outlined"
+            style={styles.formInput}
+          />
+          <Text style={styles.subsectionTitle}>Any previous loan</Text>
+          <RadioButton.Group
+            onValueChange={(val) => updateFormData('pfi_details.any_previous_loan', val)}
+            value={formData.pfi_details.any_previous_loan}
+          >
+            <View style={styles.radioOption}>
+              <RadioButton value="yes" />
+              <Text style={styles.radioText}>Yes</Text>
+            </View>
+            <View style={styles.radioOption}>
+              <RadioButton value="no" />
+              <Text style={styles.radioText}>No</Text>
+            </View>
+          </RadioButton.Group>
+          <TextInput
+            label="Market value of premises"
+            value={formData.pfi_details.market_value_of_premises}
+            onChangeText={(val) => updateFormData('pfi_details.market_value_of_premises', val)}
+            mode="outlined"
+            style={styles.formInput}
+          />
+          <TextInput
+            label="CA name"
+            value={formData.pfi_details.ca_name}
+            onChangeText={(val) => updateFormData('pfi_details.ca_name', val)}
+            mode="outlined"
+            style={styles.formInput}
+          />
+          <TextInput
+            label="CA contact number"
+            value={formData.pfi_details.ca_contact_number}
+            onChangeText={(val) => updateFormData('pfi_details.ca_contact_number', val)}
+            mode="outlined"
+            style={styles.formInput}
+            keyboardType="phone-pad"
+          />
+          <TextInput
+            label="Relative reference contact 1"
+            value={formData.pfi_details.relative_reference_contact_1}
+            onChangeText={(val) => updateFormData('pfi_details.relative_reference_contact_1', val)}
+            mode="outlined"
+            style={styles.formInput}
+            keyboardType="phone-pad"
+          />
+          <TextInput
+            label="Relative reference contact 2"
+            value={formData.pfi_details.relative_reference_contact_2}
+            onChangeText={(val) => updateFormData('pfi_details.relative_reference_contact_2', val)}
+            mode="outlined"
+            style={styles.formInput}
+            keyboardType="phone-pad"
+          />
+          <TextInput
+            label="Stock value"
+            value={formData.pfi_details.stock_value}
+            onChangeText={(val) => updateFormData('pfi_details.stock_value', val)}
+            mode="outlined"
+            style={styles.formInput}
+          />
+          <TextInput
+            label="Purchase parties name"
+            value={formData.pfi_details.purchase_parties_name}
+            onChangeText={(val) => updateFormData('pfi_details.purchase_parties_name', val)}
+            mode="outlined"
+            style={styles.formInput}
+            multiline
+          />
+          <TextInput
+            label="Supply parties name"
+            value={formData.pfi_details.supply_parties_name}
+            onChangeText={(val) => updateFormData('pfi_details.supply_parties_name', val)}
+            mode="outlined"
+            style={styles.formInput}
+            multiline
+          />
+          <TextInput
+            label="Other business income source"
+            value={formData.pfi_details.other_business_income_source}
+            onChangeText={(val) => updateFormData('pfi_details.other_business_income_source', val)}
+            mode="outlined"
+            style={styles.formInput}
+            multiline
+          />
+          <View style={styles.rowInputs}>
+            <TextInput
+              label="Family members"
+              value={String(formData.pfi_details.family_members)}
+              onChangeText={(val) => updateFormData('pfi_details.family_members', val)}
+              mode="outlined"
+              style={[styles.formInput, styles.halfInput]}
+              keyboardType="numeric"
+            />
+            <TextInput
+              label="Earning members"
+              value={String(formData.pfi_details.earning_members)}
+              onChangeText={(val) => updateFormData('pfi_details.earning_members', val)}
+              mode="outlined"
+              style={[styles.formInput, styles.halfInput]}
+              keyboardType="numeric"
+            />
+          </View>
+        </Card.Content>
+      </Card>
+    </View>
+  );
+
   const renderCaseStatus = () => (
     <View>
       <Menu
@@ -1388,6 +1564,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     <ScrollView>
       {isRv && renderRVPersonalDetails()}
       {isRv && renderRVNeighbours()}
+      {isPfi && renderPFIDetails()}
       {isBv && renderBVBasic()}
       {isBv && formData.type_of_business && renderWorkDetails()}
       {isBv && renderBVNeighbours()}
@@ -1418,6 +1595,8 @@ export default function ProcessApplicationScreen({ route, navigation }) {
         return renderWorkDetails();
       case 'bv_neighbours':
         return renderBVNeighbours();
+      case 'pfi_details':
+        return renderPFIDetails();
       case 'case_status':
         return renderCaseStatus();
       case 'take_pictures':
@@ -1505,6 +1684,14 @@ export default function ProcessApplicationScreen({ route, navigation }) {
           continue;
         }
         caseDataToSubmit[key] = formData[key];
+      }
+
+      const geoImage = (formData.locationPictures || []).find(
+        (img) => img?.latitude && img?.longitude,
+      );
+      if (geoImage?.latitude && geoImage?.longitude) {
+        caseDataToSubmit.latitude = String(geoImage.latitude);
+        caseDataToSubmit.longitute = String(geoImage.longitude);
       }
 
       caseDataToSubmit.case_id = caseId;

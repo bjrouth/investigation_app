@@ -34,7 +34,7 @@ export default function CasesScreen({ navigation }) {
     
     // Transform the nested structure into a flat array
     Object.entries(formattedData).forEach(([bankName, bankData]) => {
-      ['rv', 'bv'].forEach(type => {
+      ['rv', 'bv', 'pfi'].forEach(type => {
         const typeData = bankData[type];
         if (typeData && typeData.cases && typeData.cases.length > 0) {
           normalizedCases.push({
@@ -147,9 +147,9 @@ export default function CasesScreen({ navigation }) {
     }
   };
 
-  const loadCasesFromStorage = async () => {
+  const loadCasesFromStorage = useCallback(async () => {
     try {
-      const { cases: storedCases, totalCases: storedTotalCases } = await CasesStorage.getCasesData();
+      const { cases: storedCases } = await CasesStorage.getCasesData();
       if (storedCases && storedCases.length > 0) {
         const draftIds = await getDraftCaseIds();
         const filteredCases = filterOutDrafts(storedCases, draftIds);
@@ -166,7 +166,7 @@ export default function CasesScreen({ navigation }) {
     } catch (e) {
       return false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     const loadCases = async () => {
@@ -186,7 +186,7 @@ export default function CasesScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       loadCasesFromStorage();
-    }, []),
+    }, [loadCasesFromStorage]),
   );
 
   const handleRefresh = async () => {

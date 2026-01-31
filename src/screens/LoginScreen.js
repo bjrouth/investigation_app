@@ -7,8 +7,8 @@ import authService from '../services/authService';
 const logoImage = require('../assets/logo.png');
 
 export default function LoginScreen({ navigation }) {
-  const [username, setUsername] = useState('bijay@gmail.com');
-  const [password, setPassword] = useState('Password@123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
