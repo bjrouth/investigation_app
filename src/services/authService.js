@@ -8,6 +8,24 @@ import { TokenStorage, UserStorage, clearAllStorage } from '../utils/storage';
 
 // Interval ID for background token refresh
 let refreshIntervalId = null;
+const authListeners = new Set();
+
+export const subscribeAuthChanges = (listener) => {
+  authListeners.add(listener);
+  return () => {
+    authListeners.delete(listener);
+  };
+};
+
+const notifyAuthChange = (user) => {
+  authListeners.forEach((listener) => {
+    try {
+      listener(user);
+    } catch (error) {
+      console.warn('Auth listener error:', error);
+    }
+  });
+};
 
 /**
  * Login user
@@ -15,14 +33,19 @@ let refreshIntervalId = null;
  * @param {string} password - User's password
  * @returns {Promise<Object>} - User data and tokens
  */
-export const login = async (username, password) => {
+export const login = async (username, password, imeiList = []) => {
   try {
     // Backend expects form-data body
     const formData = new FormData();
     // Most Laravel-style APIs expect "email" + "password"
     formData.append('email', username);
     formData.append('password', password);
-    formData.append('from_mobile', true);
+    formData.append('from_mobile', 'true');
+    if (Array.isArray(imeiList)) {
+      imeiList.filter(Boolean).forEach((imei) => {
+        formData.append('imei[]', imei);
+      });
+    }
 
     const response = await api.post(API_ENDPOINTS.LOGIN, formData, {
       headers: {
@@ -62,6 +85,7 @@ export const login = async (username, password) => {
       await UserStorage.setUserData(user);
     }
 
+    notifyAuthChange(user || { user_type: null });
     return {
       success: true,
       user,
@@ -102,6 +126,7 @@ export const logout = async () => {
     stopTokenRefreshLoop();
     await clearAllStorage();
 
+    notifyAuthChange(null);
     return {
       success: true,
     };
@@ -110,6 +135,7 @@ export const logout = async () => {
     // Still try to clear storage even if there's an error
     stopTokenRefreshLoop();
     await clearAllStorage();
+    notifyAuthChange(null);
     return {
       success: false,
       error: error.message || 'Logout failed',
@@ -155,6 +181,7 @@ export const refreshToken = async () => {
     stopTokenRefreshLoop();
     await clearAllStorage();
 
+    notifyAuthChange(null);
     return {
       success: false,
       error: error.message || 'Token refresh failed',

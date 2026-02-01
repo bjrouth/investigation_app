@@ -13,10 +13,12 @@ import CasesStack from './src/navigation/CasesStack';
 import UnsubmittedCasesScreen from './src/screens/UnsubmittedCasesScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import SettingScreen from './src/screens/SettingScreen';
+import PunchLosCaseScreen from './src/screens/PunchLosCaseScreen';
+import LosDetailsScreen from './src/screens/LosDetailsScreen';
 import { AppTheme } from './src/theme/theme';
 import { initDatabase } from './src/services/database';
 import { initFileStorage } from './src/services/fileStorage';
-import authService from './src/services/authService';
+import authService, { subscribeAuthChanges } from './src/services/authService';
 
 enableScreens();
 
@@ -72,6 +74,7 @@ function MainTabs() {
 export default function App() {
   const [isReady, setIsReady] = useState(false);
   const [isAuthed, setIsAuthed] = useState(false);
+  const [userType, setUserType] = useState<string | null>(null);
 
   useEffect(() => {
     const initStorage = async () => {
@@ -93,6 +96,11 @@ export default function App() {
         setIsAuthed(authed);
         if (authed) {
           authService.startTokenRefreshLoop();
+          const user = await authService.getCurrentUser();
+          const typeFromUser = (user as any)?.user_type as string | undefined;
+          setUserType(typeFromUser || null);
+        } else {
+          setUserType(null);
         }
       } catch (error) {
         console.error('Failed to bootstrap auth:', error);
@@ -103,6 +111,15 @@ export default function App() {
     };
 
     bootstrapAuth();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeAuthChanges((user: any) => {
+      setIsAuthed(user !== null);
+      const typeFromUser = user?.user_type as string | undefined;
+      setUserType(typeFromUser || null);
+    });
+    return unsubscribe;
   }, []);
 
   if (!isReady) {
@@ -124,14 +141,19 @@ export default function App() {
           }}
         >
           {isAuthed ? (
-            <>
-              <Stack.Screen name="MainTabs" component={MainTabs} />
-              <Stack.Screen name="Login" component={LoginScreen} />
-            </>
+            userType === 'bank-admin' ? (
+              <>
+                <Stack.Screen name="LosDetails" component={LosDetailsScreen} />
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="MainTabs" component={MainTabs} />
+                <Stack.Screen name="PunchLosCase" component={PunchLosCaseScreen} />
+              </>
+            )
           ) : (
             <>
               <Stack.Screen name="Login" component={LoginScreen} />
-              <Stack.Screen name="MainTabs" component={MainTabs} />
             </>
           )}
         </Stack.Navigator>

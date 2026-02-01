@@ -3,6 +3,7 @@ import { View, StyleSheet, Image, ScrollView } from 'react-native';
 import { TextInput, Button, Text } from 'react-native-paper';
 import { AppTheme } from '../theme/theme';
 import authService from '../services/authService';
+import { getDeviceImeiList } from '../utils/deviceInfo';
 
 const logoImage = require('../assets/logo.png');
 
@@ -23,7 +24,10 @@ export default function LoginScreen({ navigation }) {
     setLoading(true);
     setErrorMessage('');
 
-    const result = await authService.login(username, password);
+    const imeiList = await getDeviceImeiList();
+    // Alert.alert('imeiList', imeiList);
+    // console.log('imeiList', imeiList);
+    const result = await authService.login(username, password, imeiList);
 
     setLoading(false);
 
@@ -39,8 +43,7 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    // On success, navigate to main tabs
-    navigation.replace('MainTabs');
+    // App.tsx listens for auth changes and routes accordingly
   };
 
   return (

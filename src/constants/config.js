@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
 // - Android emulator cannot reach "localhost" of your machine
 // - Use 10.0.2.2 to access host machine from Android emulator
 const API_HOST =
-  Platform.OS === 'android' ? 'https://mahajaninvestigations.com' : 'https://mahajaninvestigations.com';
+  Platform.OS === 'android' ? 'http://127.0.0.1:8000' : 'https://mahajaninvestigations.com';
 
 // API Configuration
 export const API_URL = `${API_HOST}/api/`;
@@ -29,6 +29,11 @@ export const API_ENDPOINTS = {
   SUBMIT_CASE: (id) => `cases/${id}/submit`,
   EMPLOYEE_CASES: 'cases/employee-case',
   EMPLOYEE_COMPLETED_CASES: 'cases/employee-completed-cases',
+
+  // LOS endpoints
+  LOS_ADD_DETAILS: 'los/add-details',
+  LOS_UPLOAD_FILES: 'los/upload-files',
+  LOS_DETAILS: 'los/details',
   
   // User endpoints
   PROFILE: 'user/profile',

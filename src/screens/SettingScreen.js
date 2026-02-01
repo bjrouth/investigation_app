@@ -90,8 +90,7 @@ export default function SettingScreen({ navigation }) {
   };
 
   const handleLostCase = () => {
-    // Handle lost case action
-    console.log('Lost Case button pressed');
+    navigation.getParent()?.navigate('PunchLosCase');
   };
 
   const handleLogout = async () => {
@@ -99,11 +98,6 @@ export default function SettingScreen({ navigation }) {
       await authService.logout();
     } catch (error) {
       console.error('Logout error:', error);
-    } finally {
-      navigation.getParent()?.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
     }
   };
 

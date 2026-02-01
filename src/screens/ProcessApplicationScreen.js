@@ -67,8 +67,8 @@ export default function ProcessApplicationScreen({ route, navigation }) {
   
   // Generate default test data based on case type
   const getDefaultFormData = () => {
-    // const defaultData = null;
-    const defaultData =  generateTestData(caseType);
+    const defaultData = null;
+    // const defaultData =  generateTestData(caseType);
     
     // Merge with empty structure to ensure all fields exist
     return {
