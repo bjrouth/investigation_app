@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, View, TouchableOpacity, Image, Alert, Modal, Dimensions, ActivityIndicator } from 'react-native';
-import { Card, Text, TextInput, Button, RadioButton, FAB, Menu, TouchableRipple, IconButton } from 'react-native-paper';
+import React, { useState, useEffect } from 'react';
+import { ScrollView, StyleSheet, View, TouchableOpacity, Image, Alert, Modal, Dimensions, ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { Card, Text, TextInput, Button, RadioButton, FAB, Menu, IconButton } from 'react-native-paper';
 import AppLayout from '../components/AppLayout';
 import AppHeader from '../components/AppHeader';
 import { AppTheme } from '../theme/theme';
-import { confirmDeleteImage, takePhotoWithGeoAndCompression, pickImageFromGallery } from '../utils/locationHelpers';
+import { confirmDeleteImage, takePhotoWithGeoAndCompression, requestLocationPermission } from '../utils/locationHelpers';
+import { Linking } from 'react-native';
 import { submitCaseData, uploadCaseFiles } from '../services/casesService';
 import NetInfo from '@react-native-community/netinfo';
 import { generateTestData } from '../utils/testDataGenerator';
@@ -45,15 +46,24 @@ export default function ProcessApplicationScreen({ route, navigation }) {
 
   // Step management
   const [step, setStep] = useState('details');
+  const [locationPermissionGranted, setLocationPermissionGranted] = useState(true);
   
-  // Menu state for status dropdown
-  const [statusMenuVisible, setStatusMenuVisible] = useState(false);
-  
-  // Menu state for signboard dropdown
-  const [signboardMenuVisible, setSignboardMenuVisible] = useState(false);
-  
-  // Menu state for id proof dropdown
-  const [idProofMenuVisible, setIdProofMenuVisible] = useState(false);
+  // Modal states for all dropdowns
+  const [relationModalVisible, setRelationModalVisible] = useState(false);
+  const [residenceOwnershipModalVisible, setResidenceOwnershipModalVisible] = useState(false);
+  const [houseClassLocalityModalVisible, setHouseClassLocalityModalVisible] = useState(false);
+  const [houseInteriorModalVisible, setHouseInteriorModalVisible] = useState(false);
+  const [livingStandardModalVisible, setLivingStandardModalVisible] = useState(false);
+  const [applicantIsModalVisible, setApplicantIsModalVisible] = useState(false);
+  const [natureOfBusinessModalVisible, setNatureOfBusinessModalVisible] = useState(false);
+  const [officeOwnershipModalVisible, setOfficeOwnershipModalVisible] = useState(false);
+  const [stabilityModalVisible, setStabilityModalVisible] = useState(false);
+  const [businessActivityModalVisible, setBusinessActivityModalVisible] = useState(false);
+  const [designationModalVisible, setDesignationModalVisible] = useState(false);
+  const [companyNatureModalVisible, setCompanyNatureModalVisible] = useState(false);
+  const [idProofModalVisible, setIdProofModalVisible] = useState(false);
+  const [signboardModalVisible, setSignboardModalVisible] = useState(false);
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
   
   // Image modal state
   const [selectedImage, setSelectedImage] = useState(null);
@@ -79,6 +89,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
         other_relation: defaultData?.residential_details?.other_relation || '',
         id_proof_seen: defaultData?.residential_details?.id_proof_seen || '',
         member_count: defaultData?.residential_details?.member_count || '',
+        family_details: defaultData?.residential_details?.family_details || '',
         earning_member_count: defaultData?.residential_details?.earning_member_count || '',
         dependent_member_count: defaultData?.residential_details?.dependent_member_count || '',
         total_stability: defaultData?.residential_details?.total_stability || '',
@@ -148,6 +159,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
       rejection_reason_other: defaultData?.rejection_reason_other || '',
       // Additional
       additional_remark: defaultData?.additional_remark || '',
+      km_travelled: defaultData?.km_travelled || '',
       // PFI Details
       pfi_details: {
         qualification: defaultData?.pfi_details?.qualification || '',
@@ -200,6 +212,19 @@ export default function ProcessApplicationScreen({ route, navigation }) {
 
   const changePage = (direction) => {
     if (direction === 'next') {
+      // Block advancing if location permission is not granted
+      if (!locationPermissionGranted) {
+        Alert.alert(
+          'Location permission required',
+          'Please allow location permission to proceed. Go to settings to enable it.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ],
+        );
+        return;
+      }
+
       if (currentStepIndex < steps.length - 1) {
         setStep(steps[currentStepIndex + 1]);
       }
@@ -209,6 +234,31 @@ export default function ProcessApplicationScreen({ route, navigation }) {
       }
     }
   };
+
+  // Request location permission on mount
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const granted = await requestLocationPermission();
+        if (mounted) {
+          setLocationPermissionGranted(!!granted);
+          if (!granted) {
+            Alert.alert(
+              'Location permission needed',
+              'This screen requires location permission to geotag photos. Please allow location permission in app settings.',
+              [
+                { text: 'OK' },
+              ],
+            );
+          }
+        }
+      } catch (e) {
+        console.warn('Error requesting location permission:', e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const renderDetailsStep = () => (
     <View>
@@ -315,15 +365,70 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             </View>
           </View>
 
-          {/* Row 5: Due Date & Geo Limit */}
+          
+
+          {/* Row 6: Due Date & Final Time */}
           <View style={styles.compactRow}>
             <View style={styles.compactField}>
               <View style={styles.compactFieldHeader}>
                 <IconButton icon="calendar" size={14} iconColor={AppTheme.colors.primary} style={styles.compactFieldIcon} />
-                <Text style={styles.compactFieldLabel}>Due Date</Text>
+                <Text style={styles.compactFieldLabel}>Close Time</Text>
               </View>
-              <Text style={styles.compactFieldValue} numberOfLines={1}>{caseData?.due_date || 'N/A'}</Text>
+              <Text style={styles.compactFieldValue} numberOfLines={1}>
+                {(() => {
+                  if (!caseData?.created_at) return 'N/A';
+                  try {
+                    const createdDate = new Date(caseData.created_at);
+                    const tatTime = caseData?.tat_time ? parseInt(caseData.tat_time, 10) : 0;
+                    if (isNaN(createdDate.getTime())) return 'N/A';
+                    const dueDate = new Date(createdDate);
+                    // Add TAT time (in hours) to created date
+                    dueDate.setHours(dueDate.getHours() + tatTime);
+                    return dueDate.toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+                  } catch {
+                    return 'N/A';
+                  }
+                })()}
+              </Text>
             </View>
+            <View style={styles.compactField}>
+              <View style={styles.compactFieldHeader}>
+                <IconButton icon="calendar-check" size={14} iconColor={AppTheme.colors.primary} style={styles.compactFieldIcon} />
+                <Text style={styles.compactFieldLabel}>Final Time</Text>
+              </View>
+              <Text style={styles.compactFieldValue} numberOfLines={1}>
+                {(() => {
+                  if (!caseData?.due_date) return 'N/A';
+                  try {
+                    const dueDate = new Date(caseData.due_date);
+                    const tatTime = caseData?.tat_time ? parseInt(caseData.tat_time, 10) : 0;
+                    if (isNaN(dueDate.getTime())) return 'N/A';
+                    const finalDate = new Date(dueDate);
+                    // Assuming TAT time is in hours, add it to the due date
+                    finalDate.setHours(finalDate.getHours() + tatTime);
+                    return finalDate.toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+                  } catch {
+                    return 'N/A';
+                  }
+                })()}
+              </Text>
+            </View>
+          </View>
+
+          {/* Row 7: Geo Limit */}
+          <View style={styles.compactRow}>
             <View style={styles.compactField}>
               <View style={styles.compactFieldHeader}>
                 <IconButton icon="map-marker-radius" size={14} iconColor={AppTheme.colors.primary} style={styles.compactFieldIcon} />
@@ -332,6 +437,23 @@ export default function ProcessApplicationScreen({ route, navigation }) {
               <Text style={styles.compactFieldValue} numberOfLines={1}>{caseData?.geo_limit || 'N/A'}</Text>
             </View>
           </View>
+
+          
+
+          {(caseData?.remarks || caseData?.additional_remark) && (
+            <View style={styles.compactRow}>
+              <View style={[styles.compactField, styles.fullWidthField]}>
+                <View style={styles.compactFieldHeader}>
+                  <IconButton icon="note-text" size={14} iconColor={AppTheme.colors.primary} style={styles.compactFieldIcon} />
+                  <Text style={styles.compactFieldLabel}>Remarks</Text>
+                </View>
+                <Text style={styles.compactFieldValue} numberOfLines={3}>
+                  {caseData?.remarks || caseData?.additional_remark || 'N/A'}
+                </Text>
+              </View>
+            </View>
+          )}
+         
         </Card.Content>
       </Card>
 
@@ -387,26 +509,6 @@ export default function ProcessApplicationScreen({ route, navigation }) {
                 }}
                 title="Camera"
                 leadingIcon="camera"
-              />
-              <Menu.Item
-                onPress={async () => {
-                  setImageSourceMenuVisible(false);
-                  try {
-                    console.log('Gallery option selected');
-                    const imageData = await pickImageFromGallery();
-                    if (imageData) {
-                      setFormData(prev => ({
-                        ...prev,
-                        locationPictures: [...prev.locationPictures, imageData]
-                      }));
-                    }
-                  } catch (error) {
-                    console.error('Gallery error:', error);
-                    Alert.alert('Error', error.message || 'Failed to pick image');
-                  }
-                }}
-                title="Gallery"
-                leadingIcon="image"
               />
             </Menu>
           </View>
@@ -479,6 +581,88 @@ export default function ProcessApplicationScreen({ route, navigation }) {
     </View>
   );
 
+  // Reusable dropdown component
+  const renderDropdown = (label, value, options, onSelect, modalVisible, setModalVisible, placeholder, icon) => {
+    const displayValue = value ? options.find(opt => opt.value === value)?.label || value : placeholder;
+    const capitalizedValue = displayValue && displayValue !== placeholder ? displayValue.charAt(0).toUpperCase() + displayValue.slice(1) : displayValue;
+    
+    return (
+      <>
+        <TouchableOpacity
+          style={styles.dropdownInput}
+          onPress={() => {
+            Keyboard.dismiss();
+            setModalVisible(true);
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={styles.dropdownContainer}>
+            {icon && <IconButton icon={icon} size={20} iconColor={AppTheme.colors.primary} style={{ margin: 0, marginRight: 8 }} />}
+            <Text
+              style={[
+                styles.dropdownLabel,
+                !value && styles.dropdownPlaceholder,
+                { flex: 1 },
+              ]}
+            >
+              {capitalizedValue}
+            </Text>
+            <Text style={styles.dropdownArrow}>▼</Text>
+          </View>
+        </TouchableOpacity>
+        
+        <Modal
+          visible={modalVisible}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.dropdownModalOverlay}
+            activeOpacity={1}
+            onPress={() => setModalVisible(false)}
+          >
+            <View style={styles.dropdownModalContent}>
+              <View style={styles.dropdownModalHeader}>
+                <Text style={styles.dropdownModalTitle}>{label}</Text>
+                <TouchableOpacity onPress={() => setModalVisible(false)}>
+                  <IconButton icon="close" size={24} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={styles.dropdownModalScrollView}>
+                {options.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.dropdownModalOption,
+                      value === option.value && styles.dropdownModalOptionSelected,
+                    ]}
+                    onPress={() => {
+                      onSelect(option.value);
+                      setModalVisible(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownModalOptionText,
+                        value === option.value && styles.dropdownModalOptionTextSelected,
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                    {value === option.value && (
+                      <IconButton icon="check" size={20} iconColor={AppTheme.colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </>
+    );
+  };
+
   const renderRVPersonalDetails = () => (
     <View>
       {/* Contact Information Section */}
@@ -496,14 +680,98 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             style={styles.formInput}
             left={<TextInput.Icon icon="account" />}
           />
-          <TextInput
-            label="Relationship with applicant*"
-            value={formData.residential_details.met_person_relation}
-            onChangeText={(val) => updateFormData('residential_details.met_person_relation', val)}
-            mode="outlined"
-            style={styles.formInput}
-            left={<TextInput.Icon icon="account-group" />}
-          />
+          <TouchableOpacity
+            style={styles.dropdownInput}
+            onPress={() => {
+              Keyboard.dismiss();
+              setRelationModalVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.dropdownContainer}>
+              <Text
+                style={[
+                  styles.dropdownLabel,
+                  !formData.residential_details.met_person_relation && styles.dropdownPlaceholder,
+                ]}
+              >
+                {formData.residential_details.met_person_relation
+                  ? {
+                      self: 'Self',
+                      mother: 'Mother',
+                      father: 'Father',
+                      sister: 'Sister',
+                      wife: 'Wife',
+                      son_daughter: 'Son/Daughter',
+                      brother: 'Brother',
+                      relative: 'Relative',
+                      other: 'Other',
+                    }[formData.residential_details.met_person_relation] ||
+                      formData.residential_details.met_person_relation
+                  : 'Relationship with applicant*'}
+              </Text>
+              <Text style={styles.dropdownArrow}>▼</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <Modal
+            visible={relationModalVisible}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setRelationModalVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.dropdownModalOverlay}
+              activeOpacity={1}
+              onPress={() => setRelationModalVisible(false)}
+            >
+              <View style={styles.dropdownModalContent}>
+                <View style={styles.dropdownModalHeader}>
+                  <Text style={styles.dropdownModalTitle}>Select Relationship</Text>
+                  <TouchableOpacity onPress={() => setRelationModalVisible(false)}>
+                    <IconButton icon="close" size={24} />
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.dropdownModalScrollView}>
+                  {[
+                    { value: 'self', label: 'Self' },
+                    { value: 'mother', label: 'Mother' },
+                    { value: 'father', label: 'Father' },
+                    { value: 'sister', label: 'Sister' },
+                    { value: 'wife', label: 'Wife' },
+                    { value: 'son_daughter', label: 'Son/Daughter' },
+                    { value: 'brother', label: 'Brother' },
+                    { value: 'relative', label: 'Relative' },
+                    { value: 'other', label: 'Other' },
+                  ].map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.dropdownModalOption,
+                        formData.residential_details.met_person_relation === option.value && styles.dropdownModalOptionSelected,
+                      ]}
+                      onPress={() => {
+                        updateFormData('residential_details.met_person_relation', option.value);
+                        setRelationModalVisible(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownModalOptionText,
+                          formData.residential_details.met_person_relation === option.value && styles.dropdownModalOptionTextSelected,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                      {formData.residential_details.met_person_relation === option.value && (
+                        <IconButton icon="check" size={20} iconColor={AppTheme.colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </TouchableOpacity>
+          </Modal>
           {formData.residential_details.met_person_relation === 'other' && (
             <TextInput
               label="Specify Other"
@@ -540,6 +808,14 @@ export default function ProcessApplicationScreen({ route, navigation }) {
               keyboardType="numeric"
               style={[styles.formInput, styles.halfInput]}
               left={<TextInput.Icon icon="account-multiple" />}
+            />
+            <TextInput
+              label="Family Details*"
+              value={formData.residential_details.family_details}
+              onChangeText={(val) => updateFormData('residential_details.family_details', val)}
+              mode="outlined"
+              style={styles.formInput}
+              left={<TextInput.Icon icon="home-group" />}
             />
             <TextInput
               label="Earning members"
@@ -586,14 +862,20 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             <IconButton icon="home" size={20} iconColor={AppTheme.colors.primary} style={styles.sectionIcon} />
             <Text style={styles.sectionTitle}>Residence Details</Text>
           </View>
-          <TextInput
-            label="Residence ownership*"
-            value={formData.residential_details.residence_ownership}
-            onChangeText={(val) => updateFormData('residential_details.residence_ownership', val)}
-            mode="outlined"
-            style={styles.formInput}
-            left={<TextInput.Icon icon="key" />}
-          />
+          {renderDropdown(
+            'Residence ownership*',
+            formData.residential_details.residence_ownership,
+            [
+              { value: 'owned', label: 'Owned' },
+              { value: 'rented', label: 'Rented' },
+              { value: 'other', label: 'Other' },
+            ],
+            (val) => updateFormData('residential_details.residence_ownership', val),
+            residenceOwnershipModalVisible,
+            setResidenceOwnershipModalVisible,
+            'Residence ownership*',
+            'key'
+          )}
           {formData.residential_details.residence_ownership === 'other' && (
             <TextInput
               label="Specify Other"
@@ -611,22 +893,36 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             style={styles.formInput}
             left={<TextInput.Icon icon="map-marker" />}
           />
-          <TextInput
-            label="House class locality"
-            value={formData.residential_details.house_class_locality}
-            onChangeText={(val) => updateFormData('residential_details.house_class_locality', val)}
-            mode="outlined"
-            style={styles.formInput}
-            left={<TextInput.Icon icon="city" />}
-          />
-          <TextInput
-            label="House interior"
-            value={formData.residential_details.house_interior}
-            onChangeText={(val) => updateFormData('residential_details.house_interior', val)}
-            mode="outlined"
-            style={styles.formInput}
-            left={<TextInput.Icon icon="sofa" />}
-          />
+          {renderDropdown(
+            'House class locality',
+            formData.residential_details.house_class_locality,
+            [
+              { value: 'good', label: 'Good' },
+              { value: 'average', label: 'Average' },
+              { value: 'below_average', label: 'Below average' },
+            ],
+            (val) => updateFormData('residential_details.house_class_locality', val),
+            houseClassLocalityModalVisible,
+            setHouseClassLocalityModalVisible,
+            'House class locality',
+            'city'
+          )}
+          {renderDropdown(
+            'House interior',
+            formData.residential_details.house_interior,
+            [
+              { value: 'good', label: 'Good' },
+              { value: 'above_average', label: 'Above average' },
+              { value: 'average', label: 'Average' },
+              { value: 'below_average', label: 'Below average' },
+              { value: 'other', label: 'Other' },
+            ],
+            (val) => updateFormData('residential_details.house_interior', val),
+            houseInteriorModalVisible,
+            setHouseInteriorModalVisible,
+            'House interior',
+            'sofa'
+          )}
           {formData.residential_details.house_interior === 'other' && (
             <TextInput
               label="Specify Other"
@@ -636,14 +932,22 @@ export default function ProcessApplicationScreen({ route, navigation }) {
               style={styles.formInput}
             />
           )}
-          <TextInput
-            label="Living standard"
-            value={formData.residential_details.living_standard}
-            onChangeText={(val) => updateFormData('residential_details.living_standard', val)}
-            mode="outlined"
-            style={styles.formInput}
-            left={<TextInput.Icon icon="star" />}
-          />
+          {renderDropdown(
+            'Living standard',
+            formData.residential_details.living_standard,
+            [
+              { value: 'good', label: 'Good' },
+              { value: 'above_average', label: 'Above average' },
+              { value: 'average', label: 'Average' },
+              { value: 'below_average', label: 'Below average' },
+              { value: 'other', label: 'Other' },
+            ],
+            (val) => updateFormData('residential_details.living_standard', val),
+            livingStandardModalVisible,
+            setLivingStandardModalVisible,
+            'Living standard',
+            'star'
+          )}
           {formData.residential_details.living_standard === 'other' && (
             <TextInput
               label="Specify Other"
@@ -706,6 +1010,15 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             multiline
             numberOfLines={4}
             left={<TextInput.Icon icon="pencil" />}
+          />
+          <TextInput
+            label="KM Travelled"
+            value={formData.km_travelled || ''}
+            onChangeText={(val) => updateFormData('km_travelled', val)}
+            mode="outlined"
+            style={styles.formInput}
+            keyboardType="numeric"
+            left={<TextInput.Icon icon="car" />}
           />
         </Card.Content>
       </Card>
@@ -824,13 +1137,21 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             mode="outlined"
             style={styles.input}
           />
-          <TextInput
-            label="Applicant Designation*"
-            value={formData.self_employed.applicant_is}
-            onChangeText={(val) => updateFormData('self_employed.applicant_is', val)}
-            mode="outlined"
-            style={styles.input}
-          />
+          {renderDropdown(
+            'Applicant Designation*',
+            formData.self_employed.applicant_is,
+            [
+              { value: 'proprietor', label: 'Proprietor' },
+              { value: 'partner', label: 'Partner' },
+              { value: 'director', label: 'Director' },
+              { value: 'other', label: 'Other' },
+            ],
+            (val) => updateFormData('self_employed.applicant_is', val),
+            applicantIsModalVisible,
+            setApplicantIsModalVisible,
+            'Applicant Designation*',
+            null
+          )}
           {formData.self_employed.applicant_is === 'other' && (
             <TextInput
               label="Specify Other"
@@ -840,13 +1161,23 @@ export default function ProcessApplicationScreen({ route, navigation }) {
               style={styles.input}
             />
           )}
-          <TextInput
-            label="Nature of business*"
-            value={formData.self_employed.nature_of_business}
-            onChangeText={(val) => updateFormData('self_employed.nature_of_business', val)}
-            mode="outlined"
-            style={styles.input}
-          />
+          {renderDropdown(
+            'Nature of business*',
+            formData.self_employed.nature_of_business,
+            [
+              { value: 'manufacturing', label: 'Manufacturing' },
+              { value: 'trading', label: 'Trading' },
+              { value: 'service_provider', label: 'Service Provider' },
+              { value: 'professional', label: 'Professional' },
+              { value: 'contractor', label: 'Contractor' },
+              { value: 'other', label: 'Other' },
+            ],
+            (val) => updateFormData('self_employed.nature_of_business', val),
+            natureOfBusinessModalVisible,
+            setNatureOfBusinessModalVisible,
+            'Nature of business*',
+            null
+          )}
           {formData.self_employed.nature_of_business === 'other' && (
             <TextInput
               label="Specify Other"
@@ -856,20 +1187,36 @@ export default function ProcessApplicationScreen({ route, navigation }) {
               style={styles.input}
             />
           )}
-          <TextInput
-            label="Business Premisis*"
-            value={formData.self_employed.office_ownership}
-            onChangeText={(val) => updateFormData('self_employed.office_ownership', val)}
-            mode="outlined"
-            style={styles.input}
-          />
-          <TextInput
-            label="Stability*"
-            value={formData.self_employed.stability}
-            onChangeText={(val) => updateFormData('self_employed.stability', val)}
-            mode="outlined"
-            style={styles.input}
-          />
+          {renderDropdown(
+            'Business Premisis*',
+            formData.self_employed.office_ownership,
+            [
+              { value: 'owned', label: 'Owned' },
+              { value: 'parental', label: 'Parental' },
+              { value: 'spouse', label: 'Spouse' },
+              { value: 'rental', label: 'Rental' },
+              { value: 'shared', label: 'Shared' },
+              { value: 'lease', label: 'Lease' },
+            ],
+            (val) => updateFormData('self_employed.office_ownership', val),
+            officeOwnershipModalVisible,
+            setOfficeOwnershipModalVisible,
+            'Business Premisis*',
+            null
+          )}
+          {renderDropdown(
+            'Stability*',
+            formData.self_employed.stability,
+            [
+              { value: 'by_birth', label: 'By Birth' },
+              { value: 'other', label: 'Other' },
+            ],
+            (val) => updateFormData('self_employed.stability', val),
+            stabilityModalVisible,
+            setStabilityModalVisible,
+            'Stability*',
+            null
+          )}
           {formData.self_employed.stability === 'other' && (
             <TextInput
               label="Other remark"
@@ -894,13 +1241,20 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             mode="outlined"
             style={styles.input}
           />
-          <TextInput
-            label="Business activity seen level*"
-            value={formData.self_employed.business_activity_level_seen}
-            onChangeText={(val) => updateFormData('self_employed.business_activity_level_seen', val)}
-            mode="outlined"
-            style={styles.input}
-          />
+          {renderDropdown(
+            'Business activity seen level*',
+            formData.self_employed.business_activity_level_seen,
+            [
+              { value: 'good', label: 'Good' },
+              { value: 'average', label: 'Average' },
+              { value: 'low', label: 'Low' },
+            ],
+            (val) => updateFormData('self_employed.business_activity_level_seen', val),
+            businessActivityModalVisible,
+            setBusinessActivityModalVisible,
+            'Business activity seen level*',
+            null
+          )}
           <TextInput
             label="Employees seen*"
             value={formData.self_employed.employee_seen}
@@ -922,38 +1276,19 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             mode="outlined"
             style={styles.input}
           />
-          <Menu
-            visible={signboardMenuVisible}
-            onDismiss={() => setSignboardMenuVisible(false)}
-            anchor={
-              <TouchableRipple
-                onPress={() => setSignboardMenuVisible(true)}
-                style={styles.dropdownInput}
-              >
-                <View style={styles.dropdownContainer}>
-                  <Text style={[styles.dropdownLabel, !formData.signboard_seen_with_name && styles.dropdownPlaceholder]}>
-                    {formData.signboard_seen_with_name ? formData.signboard_seen_with_name.charAt(0).toUpperCase() + formData.signboard_seen_with_name.slice(1) : 'Signboard seen with name'}
-                  </Text>
-                  <Text style={styles.dropdownArrow}>▼</Text>
-                </View>
-              </TouchableRipple>
-            }
-          >
-            <Menu.Item
-              onPress={() => {
-                updateFormData('signboard_seen_with_name', 'yes');
-                setSignboardMenuVisible(false);
-              }}
-              title="Yes"
-            />
-            <Menu.Item
-              onPress={() => {
-                updateFormData('signboard_seen_with_name', 'no');
-                setSignboardMenuVisible(false);
-              }}
-              title="No"
-            />
-          </Menu>
+          {renderDropdown(
+            'Signboard seen with name',
+            formData.signboard_seen_with_name,
+            [
+              { value: 'yes', label: 'Yes' },
+              { value: 'no', label: 'No' },
+            ],
+            (val) => updateFormData('signboard_seen_with_name', val),
+            signboardModalVisible,
+            setSignboardModalVisible,
+            'Signboard seen with name',
+            null
+          )}
           <TextInput
             label="Exterior and off floor"
             value={formData.self_employed.exterior_off_floor}
@@ -981,13 +1316,23 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             mode="outlined"
             style={styles.input}
           />
-          <TextInput
-            label="Nature of job(designation)*"
-            value={formData.service.designation}
-            onChangeText={(val) => updateFormData('service.designation', val)}
-            mode="outlined"
-            style={styles.input}
-          />
+          {renderDropdown(
+            'Nature of job(designation)*',
+            formData.service.designation,
+            [
+              { value: 'manager', label: 'Manager' },
+              { value: 'super_viser', label: 'Super Viser' },
+              { value: 'field_job', label: 'Field Job' },
+              { value: 'clerk', label: 'Clerk' },
+              { value: 'class_4', label: 'Class iv' },
+              { value: 'other', label: 'Other' },
+            ],
+            (val) => updateFormData('service.designation', val),
+            designationModalVisible,
+            setDesignationModalVisible,
+            'Nature of job(designation)*',
+            null
+          )}
           <TextInput
             label="Department & room no.*"
             value={formData.service.department_room_number}
@@ -1002,13 +1347,23 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             mode="outlined"
             style={styles.input}
           />
-          <TextInput
-            label="Company nature of business"
-            value={formData.service.company_nature_of_business}
-            onChangeText={(val) => updateFormData('service.company_nature_of_business', val)}
-            mode="outlined"
-            style={styles.input}
-          />
+          {renderDropdown(
+            'Company nature of business',
+            formData.service.company_nature_of_business,
+            [
+              { value: 'service_provider', label: 'Service provider' },
+              { value: 'insurance_company', label: 'Insurance company' },
+              { value: 'manufacturing_company', label: 'Manufacturing unit' },
+              { value: 'it_computer_related_jobs', label: 'IT - Computer related jobs' },
+              { value: 'letter_head', label: 'Letter head' },
+              { value: 'other', label: 'Other' },
+            ],
+            (val) => updateFormData('service.company_nature_of_business', val),
+            companyNatureModalVisible,
+            setCompanyNatureModalVisible,
+            'Company nature of business',
+            null
+          )}
           <TextInput
             label="Applicant is drawing salary PM*"
             value={formData.service.drawing_salary_per_month}
@@ -1016,38 +1371,19 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             mode="outlined"
             style={styles.input}
           />
-          <Menu
-            visible={idProofMenuVisible}
-            onDismiss={() => setIdProofMenuVisible(false)}
-            anchor={
-              <TouchableRipple
-                onPress={() => setIdProofMenuVisible(true)}
-                style={styles.dropdownInput}
-              >
-                <View style={styles.dropdownContainer}>
-                  <Text style={[styles.dropdownLabel, !formData.service.id_proof_seen && styles.dropdownPlaceholder]}>
-                    {formData.service.id_proof_seen ? formData.service.id_proof_seen.charAt(0).toUpperCase() + formData.service.id_proof_seen.slice(1) : 'Id proof seen*'}
-                  </Text>
-                  <Text style={styles.dropdownArrow}>▼</Text>
-                </View>
-              </TouchableRipple>
-            }
-          >
-            <Menu.Item
-              onPress={() => {
-                updateFormData('service.id_proof_seen', 'yes');
-                setIdProofMenuVisible(false);
-              }}
-              title="Yes"
-            />
-            <Menu.Item
-              onPress={() => {
-                updateFormData('service.id_proof_seen', 'no');
-                setIdProofMenuVisible(false);
-              }}
-              title="No"
-            />
-          </Menu>
+          {renderDropdown(
+            'Id proof seen*',
+            formData.service.id_proof_seen,
+            [
+              { value: 'yes', label: 'Yes' },
+              { value: 'no', label: 'No' },
+            ],
+            (val) => updateFormData('service.id_proof_seen', val),
+            idProofModalVisible,
+            setIdProofModalVisible,
+            'Id proof seen*',
+            null
+          )}
           <TextInput
             label="Employee seen*"
             value={formData.service.employee_seen}
@@ -1279,38 +1615,19 @@ export default function ProcessApplicationScreen({ route, navigation }) {
 
   const renderCaseStatus = () => (
     <View>
-      <Menu
-        visible={statusMenuVisible}
-        onDismiss={() => setStatusMenuVisible(false)}
-        anchor={
-          <TouchableRipple
-            onPress={() => setStatusMenuVisible(true)}
-            style={styles.dropdownInput}
-          >
-            <View style={styles.dropdownContainer}>
-              <Text style={[styles.dropdownLabel, !formData.case_status && styles.dropdownPlaceholder]}>
-                {formData.case_status ? formData.case_status.charAt(0).toUpperCase() + formData.case_status.slice(1) : 'Status*'}
-              </Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
-            </View>
-          </TouchableRipple>
-        }
-      >
-        <Menu.Item
-          onPress={() => {
-            updateFormData('case_status', 'positive');
-            setStatusMenuVisible(false);
-          }}
-          title="Positive"
-        />
-        <Menu.Item
-          onPress={() => {
-            updateFormData('case_status', 'negative');
-            setStatusMenuVisible(false);
-          }}
-          title="Negative"
-        />
-      </Menu>
+      {renderDropdown(
+        'Status*',
+        formData.case_status,
+        [
+          { value: 'positive', label: 'POSITIVE' },
+          { value: 'negative', label: 'NEGATIVE' },
+        ],
+        (val) => updateFormData('case_status', val),
+        statusModalVisible,
+        setStatusModalVisible,
+        'Status*',
+        null
+      )}
       {formData.case_status === 'negative' && (
         <Card style={styles.radioCard}>
           <Card.Content>
@@ -1407,27 +1724,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
               <Text style={styles.elegantActionButtonText}>Camera</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.elegantPhotoActionButton,
-                styles.elegantPhotoActionButtonPrimary
-              ]}
-              onPress={async () => {
-                try {
-                  const imageData = await pickImageFromGallery();
-                  setFormData(prev => ({
-                    ...prev,
-                    locationPictures: [...prev.locationPictures, imageData],
-                    photo_source: 'gallery'
-                  }));
-                } catch (error) {
-                  Alert.alert('Error', error.message || 'Failed to pick image');
-                }
-              }}
-            >
-              <IconButton icon="image" size={22} iconColor={AppTheme.colors.surface} style={styles.elegantActionIcon} />
-              <Text style={styles.elegantActionButtonText}>Gallery</Text>
-            </TouchableOpacity>
+            {/* Gallery picker removed */}
 
             <TouchableOpacity
               style={[
@@ -1557,11 +1854,20 @@ export default function ProcessApplicationScreen({ route, navigation }) {
         multiline
         numberOfLines={4}
       />
+      <TextInput
+        label="KM Travelled"
+        value={formData.km_travelled || ''}
+        onChangeText={(val) => updateFormData('km_travelled', val)}
+        mode="outlined"
+        style={styles.input}
+        keyboardType="numeric"
+        left={<TextInput.Icon icon="car" />}
+      />
     </View>
   );
 
   const renderRemarkSubmit = () => (
-    <ScrollView>
+    <ScrollView keyboardShouldPersistTaps="handled">
       {isRv && renderRVPersonalDetails()}
       {isRv && renderRVNeighbours()}
       {isPfi && renderPFIDetails()}
@@ -1577,6 +1883,15 @@ export default function ProcessApplicationScreen({ route, navigation }) {
         style={styles.input}
         multiline
         numberOfLines={4}
+      />
+      <TextInput
+        label="KM Travelled"
+        value={formData.km_travelled || ''}
+        onChangeText={(val) => updateFormData('km_travelled', val)}
+        mode="outlined"
+        style={styles.input}
+        keyboardType="numeric"
+        left={<TextInput.Icon icon="car" />}
       />
     </ScrollView>
   );
@@ -1735,7 +2050,16 @@ export default function ProcessApplicationScreen({ route, navigation }) {
       await CasesStorage.removeCaseById(caseId);
 
       Alert.alert('Success', 'Case submitted successfully.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { 
+          text: 'OK', 
+          onPress: () => {
+            // Navigate to CasesList screen
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'CasesList' }],
+            });
+          }
+        },
       ]);
     } catch (error) {
       console.error('Submit error:', error);
@@ -1780,8 +2104,18 @@ export default function ProcessApplicationScreen({ route, navigation }) {
   return (
     <AppLayout>
       <AppHeader title={getHeaderTitle()} back navigation={navigation} />
-      <View style={styles.container}>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior="padding"
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.contentContainer}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={true}
+        >
           {renderStepContent()}
         </ScrollView>
         {currentStepIndex > 0 && (
@@ -1812,8 +2146,8 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             color="white"
             size="small"
           />
-        )}
-      </View>
+          )}
+      </KeyboardAvoidingView>
       
       {/* Image Modal for Full Screen View */}
       <Modal
@@ -2462,6 +2796,55 @@ const styles = StyleSheet.create({
   dropdownArrow: {
     fontSize: 12,
     color: AppTheme.colors.onSurfaceVariant,
+  },
+  dropdownModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  dropdownModalContent: {
+    backgroundColor: AppTheme.colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: Dimensions.get('window').height * 0.7,
+    paddingBottom: 20,
+  },
+  dropdownModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: AppTheme.colors.outline,
+  },
+  dropdownModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: AppTheme.colors.onSurface,
+  },
+  dropdownModalScrollView: {
+    maxHeight: Dimensions.get('window').height * 0.6,
+  },
+  dropdownModalOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: AppTheme.colors.outline + '20',
+  },
+  dropdownModalOptionSelected: {
+    backgroundColor: AppTheme.colors.primary + '10',
+  },
+  dropdownModalOptionText: {
+    fontSize: 16,
+    color: AppTheme.colors.onSurface,
+  },
+  dropdownModalOptionTextSelected: {
+    fontWeight: '600',
+    color: AppTheme.colors.primary,
   },
   // Elegant Photo Section Styles
   elegantPhotoCard: {

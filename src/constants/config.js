@@ -7,8 +7,9 @@ import { Platform } from 'react-native';
 // API host must be different for Android emulator
 // - Android emulator cannot reach "localhost" of your machine
 // - Use 10.0.2.2 to access host machine from Android emulator
+// http://localhost:8000
 const API_HOST =
-  Platform.OS === 'android' ? 'http://127.0.0.1:8000' : 'https://mahajaninvestigations.com';
+  Platform.OS === 'android' ? 'https://mahajaninvestigations.com' : 'https://mahajaninvestigations.com';
 
 // API Configuration
 export const API_URL = `${API_HOST}/api/`;

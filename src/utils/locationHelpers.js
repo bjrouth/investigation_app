@@ -179,6 +179,49 @@ const requestCameraPermission = async () => {
   }
 };
 
+/**
+ * Request location permission (Android & iOS)
+ * @returns {Promise<boolean>} True if permission granted
+ */
+export const requestLocationPermission = async () => {
+  try {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location Permission',
+          message: 'This app needs access to your location to geotag photos.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+
+    // iOS: ask via Geolocation API
+    if (Platform.OS === 'ios' && Geolocation && Geolocation.requestAuthorization) {
+      try {
+        const auth = Geolocation.requestAuthorization();
+        // requestAuthorization returns a string like 'granted' or a Promise
+        if (typeof auth === 'string') {
+          return auth === 'granted';
+        }
+        const resolved = await auth;
+        return resolved === 'granted';
+      } catch (e) {
+        console.warn('iOS location permission request error:', e);
+        return false;
+      }
+    }
+
+    return false;
+  } catch (error) {
+    console.warn('requestLocationPermission error:', error);
+    return false;
+  }
+};
+
 const buildGeoStampText = (location, address) => {
   const parts = [];
   if (location?.latitude && location?.longitude) {

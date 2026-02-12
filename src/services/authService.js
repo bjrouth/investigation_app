@@ -151,8 +151,22 @@ export const refreshToken = async () => {
   try {
     const refresh_token = await TokenStorage.getRefreshToken();
 
+    // if (!refresh_token) {
+    //   throw new Error('No refresh token available');
+      
+    // }
+
     if (!refresh_token) {
-      throw new Error('No refresh token available');
+      console.warn('No refresh token found. Logging out...');
+
+      stopTokenRefreshLoop();
+      await clearAllStorage();
+      notifyAuthChange(null);
+
+      return {
+        success: false,
+        error: 'Please logout and login again',
+      };
     }
 
     const response = await api.post(API_ENDPOINTS.REFRESH, {
@@ -244,7 +258,7 @@ export const startTokenRefreshLoop = (intervalMs = 30000) => {
         await refreshToken();
       } else {
         // No refresh token available, stop the loop
-        console.warn('No refresh token available, stopping refresh loop');
+        console.warn('Please logout and login again, stopping refresh loop');
         stopTokenRefreshLoop();
       }
     } catch (e) {

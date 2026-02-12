@@ -29,7 +29,7 @@ export default function CasesScreen({ navigation }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [totalCases, setTotalCases] = useState(0);
 
-  const normalizeCases = (formattedData) => {
+  const normalizeCases = useCallback((formattedData) => {
     const normalizedCases = [];
     
     // Transform the nested structure into a flat array
@@ -51,9 +51,9 @@ export default function CasesScreen({ navigation }) {
     });
 
     return normalizedCases;
-  };
+  }, []);
 
-  const getDraftCaseIds = async () => {
+  const getDraftCaseIds = useCallback(async () => {
     try {
       const drafts = await getDraftCases();
       return new Set(
@@ -65,9 +65,9 @@ export default function CasesScreen({ navigation }) {
       console.error('Failed to load draft cases:', error);
       return new Set();
     }
-  };
+  }, []);
 
-  const filterOutDrafts = (caseList, draftIds) => {
+  const filterOutDrafts = useCallback((caseList, draftIds) => {
     if (!draftIds || draftIds.size === 0) return caseList;
     return caseList
       .map((group) => {
@@ -93,9 +93,9 @@ export default function CasesScreen({ navigation }) {
         };
       })
       .filter(Boolean);
-  };
+  }, []);
 
-  const fetchCases = async (isRefresh = false) => {
+  const fetchCases = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
@@ -145,48 +145,28 @@ export default function CasesScreen({ navigation }) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
-
-  const loadCasesFromStorage = useCallback(async () => {
-    try {
-      const { cases: storedCases } = await CasesStorage.getCasesData();
-      if (storedCases && storedCases.length > 0) {
-        const draftIds = await getDraftCaseIds();
-        const filteredCases = filterOutDrafts(storedCases, draftIds);
-        const casesTotal = filteredCases.reduce(
-          (sum, item) => sum + (item.caseCount || item.cases?.length || 0),
-          0,
-        );
-        setCases(filteredCases);
-        setTotalCases(casesTotal);
-        setLoading(false);
-        return true;
-      }
-      return false;
-    } catch (e) {
-      return false;
-    }
-  }, []);
+  }, [filterOutDrafts, getDraftCaseIds, normalizeCases]);
 
   useEffect(() => {
-    const loadCases = async () => {
+    // const loadCases = async () => {
       // Try to load from local storage first
-      const hasStoredData = await loadCasesFromStorage();
+      // const hasStoredData = await loadCasesFromStorage();
       
       // If no stored data, fetch from API
-      if (!hasStoredData) {
-        await fetchCases(false);
-      }
-    };
+      // if (!hasStoredData) {
+        // await fetchCases(false);
+      // }
+    // };
 
-    loadCases();
+    // loadCases();
+    fetchCases(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadCasesFromStorage();
-    }, [loadCasesFromStorage]),
+      fetchCases(true);
+    }, [fetchCases]),
   );
 
   const handleRefresh = async () => {

@@ -84,11 +84,6 @@ export default function LosDetailsScreen({ navigation }) {
       await authService.logout();
     } catch (error) {
       console.error('Logout error:', error);
-    } finally {
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
     }
   };
 

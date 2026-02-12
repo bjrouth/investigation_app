@@ -82,7 +82,7 @@ submitCaseApi.interceptors.response.use(
         const refreshToken = await TokenStorage.getRefreshToken();
         
         if (!refreshToken) {
-          throw new Error('No refresh token available');
+          throw new Error('Please logout and login again');
         }
 
         // Call refresh token endpoint using main api instance

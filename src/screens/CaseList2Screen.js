@@ -16,7 +16,7 @@ const formatCaseData = (caseObj) => {
   const businessAddress = caseObj.business_colony_details
     ? `${caseObj.business_house_number || ''} ${caseObj.business_colony_details}, ${caseObj.business_city || ''}`.trim()
     : '';
-  const address = businessAddress || residenceAddress || 'Address not available';
+  const address = caseObj.is_rv ? residenceAddress :businessAddress   || 'Address not available';
 
   // Format date
   const date = caseObj.created_at
@@ -43,6 +43,7 @@ const formatCaseData = (caseObj) => {
     caseObj.customer_name ||
     caseObj.name ||
     '';
+    console.log(caseObj, '000');
 
   return {
     id: caseObj.id || caseObj.case_id || String(Math.random()),
@@ -53,6 +54,7 @@ const formatCaseData = (caseObj) => {
     address: address,
     phone: showPhone ? phone : null,
     dateTime: date,
+    remarks: caseObj.remarks || caseObj.additional_remark || null,
     caseData: caseObj, // Store full case data for navigation
   };
 };
@@ -181,9 +183,14 @@ export default function CaseList2Screen({ route, navigation }) {
                       </Chip>
                     </View>
 
-                    <Text style={styles.addressText} numberOfLines={2}>
-                      {caseData.address}
+                    <Text style={styles.addressText} >
+                      Address:{caseData.address}
                     </Text>
+                    {caseData.remarks ? (
+                      <Text style={styles.phoneText}>
+                        Remark: {caseData.remarks}
+                      </Text>
+                    ) : null}
 
                     {caseData.phone ? (
                       <Text style={styles.phoneText} numberOfLines={1}>

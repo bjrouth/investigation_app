@@ -84,7 +84,7 @@ api.interceptors.response.use(
         
         if (!refreshToken) {
           // No refresh token, redirect to login
-          throw new Error('No refresh token available');
+          throw new Error('Please logout and login again');
         }
 
         // Call refresh token endpoint using base axios instance
