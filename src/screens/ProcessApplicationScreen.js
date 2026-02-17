@@ -799,7 +799,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
             <IconButton icon="home-group" size={20} iconColor={AppTheme.colors.primary} style={styles.sectionIcon} />
             <Text style={styles.sectionTitle}>Family Details</Text>
           </View>
-          <View style={styles.rowInputs}>
+          {/* <View style={styles.rowInputs}> */}
             <TextInput
               label="Total family members*"
               value={formData.residential_details.member_count}
@@ -826,7 +826,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
               style={[styles.formInput, styles.halfInput]}
               left={<TextInput.Icon icon="briefcase" />}
             />
-          </View>
+          {/* </View> */}
           <TextInput
             label="Dependent members"
             value={formData.residential_details.dependent_member_count}
@@ -2014,6 +2014,30 @@ export default function ProcessApplicationScreen({ route, navigation }) {
         caseDataToSubmit.id = caseData.id;
       }
 
+      const images = formData.locationPictures || [];
+      // Use the same case id as submit-case (prefer numeric id)
+      const uploadCaseId = caseData?.id || caseId;
+
+      
+
+      // First upload files, then submit case data (upload is required when files present)
+      let uploadResult = { success: true };
+      if (images.length > 0) {
+        uploadResult = await uploadCaseFiles(uploadCaseId, images);
+        if (!uploadResult.success) {
+          if (isNetworkError(uploadResult)) {
+            await saveDraftLocally();
+            Alert.alert('Offline', 'No internet connection. Case saved as Draft in History.', [
+              { text: 'OK', onPress: () => navigation.goBack() },
+            ]);
+            return;
+          }
+          Alert.alert('Error', uploadResult.error || 'File upload failed.');
+          return;
+        }
+      }
+
+      // After successful upload (or if no files), submit case data
       const caseResult = await submitCaseData(caseDataToSubmit);
       if (!caseResult.success) {
         if (isNetworkError(caseResult)) {
@@ -2024,26 +2048,6 @@ export default function ProcessApplicationScreen({ route, navigation }) {
           return;
         }
         Alert.alert('Error', caseResult.error || 'Failed to submit case data.');
-        return;
-      }
-
-      const images = formData.locationPictures || [];
-      // Use the same case id as submit-case (prefer numeric id)
-      const uploadCaseId = caseData?.id || caseId;
-      let uploadResult = { success: true };
-      if (images.length > 0) {
-        uploadResult = await uploadCaseFiles(uploadCaseId, images);
-      }
-
-      if (!uploadResult.success) {
-        if (isNetworkError(uploadResult)) {
-          await saveDraftLocally();
-          Alert.alert('Offline', 'No internet connection. Case saved as Draft in History.', [
-            { text: 'OK', onPress: () => navigation.goBack() },
-          ]);
-          return;
-        }
-        Alert.alert('Error', uploadResult.error || 'File upload failed.');
         return;
       }
 

@@ -313,4 +313,3 @@ export default {
   submitCaseData,
   uploadCaseFiles,
 };
-

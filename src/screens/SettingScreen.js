@@ -103,7 +103,7 @@ export default function SettingScreen({ navigation }) {
 
   return (
     <AppLayout>
-      <AppHeader title="Setting"  />
+      <AppHeader title="Settings"  />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <Card style={styles.card}>
           <Card.Content style={styles.cardContent}>
