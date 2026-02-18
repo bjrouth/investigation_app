@@ -26,6 +26,28 @@ const formatFileSize = (bytes) => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 };
 
+// Helper function to format date to IST locale string
+const formatDateToISTLocale = (dateString) => {
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    // Convert to IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+    const istDate = new Date(date.getTime() + istOffset);
+    
+    return istDate.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (error) {
+    console.error('Error formatting date to IST:', error);
+    return 'N/A';
+  }
+};
+
 export default function ProcessApplicationScreen({ route, navigation }) {
   const { caseData } = route.params || {};
   
@@ -384,13 +406,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
                     const dueDate = new Date(createdDate);
                     // Add TAT time (in hours) to created date
                     dueDate.setHours(dueDate.getHours() + tatTime);
-                    return dueDate.toLocaleString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
+                    return formatDateToISTLocale(dueDate.toISOString());
                   } catch {
                     return 'N/A';
                   }
@@ -412,13 +428,7 @@ export default function ProcessApplicationScreen({ route, navigation }) {
                     const finalDate = new Date(dueDate);
                     // Assuming TAT time is in hours, add it to the due date
                     finalDate.setHours(finalDate.getHours() + tatTime);
-                    return finalDate.toLocaleString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
+                    return formatDateToISTLocale(finalDate.toISOString());
                   } catch {
                     return 'N/A';
                   }
@@ -569,6 +579,11 @@ export default function ProcessApplicationScreen({ route, navigation }) {
                     {img.fileSize && (
                       <Text style={styles.compactImageInfoDetail} numberOfLines={1}>
                         📦 {formatFileSize(img.fileSize)}
+                      </Text>
+                    )}
+                    {img.capturedAt && (
+                      <Text style={styles.compactImageInfoDetail} numberOfLines={1}>
+                        🕒 {img.capturedAt}
                       </Text>
                     )}
                   </View>
@@ -1825,6 +1840,11 @@ export default function ProcessApplicationScreen({ route, navigation }) {
                         📦 {formatFileSize(img.fileSize)}
                       </Text>
                     )}
+                    {img.capturedAt && (
+                      <Text style={styles.elegantImageInfoDetail} numberOfLines={1}>
+                        🕒 {img.capturedAt}
+                      </Text>
+                    )}
                   </View>
                 </View>
               ))}
@@ -2216,6 +2236,14 @@ export default function ProcessApplicationScreen({ route, navigation }) {
                     <IconButton icon="file-image" size={16} iconColor={AppTheme.colors.surface} style={styles.modalInfoIcon} />
                     <Text style={styles.modalImageDetailText}>
                       Size: {formatFileSize(selectedImage.fileSize)}
+                    </Text>
+                  </View>
+                )}
+                {selectedImage.capturedAt && (
+                  <View style={styles.modalImageInfoRow}>
+                    <IconButton icon="clock" size={16} iconColor={AppTheme.colors.surface} style={styles.modalInfoIcon} />
+                    <Text style={styles.modalImageDetailText}>
+                      Captured: {selectedImage.capturedAt}
                     </Text>
                   </View>
                 )}

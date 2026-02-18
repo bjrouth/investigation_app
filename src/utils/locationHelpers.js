@@ -11,6 +11,7 @@ import RNFS from 'react-native-fs';
 import { Alert, Platform, PermissionsAndroid } from 'react-native';
 import { API_CONFIG } from '../constants/config';
 import NetInfo from '@react-native-community/netinfo';
+import moment from 'moment';
 
 // Initialize Geocoder with API key if available
 if (API_CONFIG?.GOOGLE_MAPS_API_KEY) {
@@ -411,7 +412,7 @@ export const takePhotoWithGeoAndCompression = async () => {
       longitude: location?.longitude || null,
       accuracy: location?.accuracy || null,
       address,
-      capturedAt: new Date().toISOString(),
+      capturedAt: moment().utcOffset('+05:30').format('DD/MM/YYYY hh:mm A'),
       fileSize: fileSize,
       width: result.width,
       height: result.height,
@@ -490,7 +491,7 @@ export const pickImageFromGallery = async () => {
       name: `location_${Date.now()}.jpg`,
       // No latitude/longitude for gallery images
       address: 'Gallery image',
-      capturedAt: new Date().toISOString(),
+      capturedAt: moment().utcOffset('+05:30').format('DD/MM/YYYY hh:mm A'),
       fileSize: fileSize,
       width: result.width,
       height: result.height,
